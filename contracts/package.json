@@ -11,6 +11,8 @@
   "license": "ISC",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "hardhat": "^2.19.4"
+    "@nomiclabs/hardhat-solhint": "^3.0.1",
+    "hardhat": "^2.19.4",
+    "hardhat-abi-exporter": "^2.10.1"
   }
 }
