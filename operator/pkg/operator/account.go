@@ -5,6 +5,8 @@ import (
 	"math/big"
 )
 
+const accountSize = 160
+
 type Account struct {
 	Index     *big.Int
 	Nonce     *big.Int
@@ -12,7 +14,7 @@ type Account struct {
 	Balance   *big.Int
 }
 
-func (a *Account) Serialize() ([]byte, error) {
+func (a *Account) Serialize() []byte {
 	var serialized []byte
 
 	indexBytes := a.Index.Bytes()
@@ -36,5 +38,5 @@ func (a *Account) Serialize() ([]byte, error) {
 	copy(paddedBalance[32-len(balanceBytes):], balanceBytes)
 	serialized = append(serialized, paddedBalance...)
 
-	return serialized, nil
+	return serialized
 }
