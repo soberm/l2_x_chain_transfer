@@ -142,19 +142,19 @@ func (a *App) Setup() error {
 		exists = false
 	}
 
-	provingKeyFile, err := os.OpenFile(a.config.Circuit.ProvingKeyPath, os.O_CREATE|os.O_RDWR, 0644)
+	provingKeyFile, err := os.OpenFile(a.config.Circuit.ProvingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
 	defer provingKeyFile.Close()
 
-	verifyingKeyFile, err := os.OpenFile(a.config.Circuit.VerifyingKeyPath, os.O_CREATE|os.O_RDWR, 0644)
+	verifyingKeyFile, err := os.OpenFile(a.config.Circuit.VerifyingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
 	defer verifyingKeyFile.Close()
 
-	solidityVerifierFile, err := os.OpenFile(a.config.Circuit.SolidityVerifierPath, os.O_CREATE|os.O_RDWR, 0644)
+	solidityVerifierFile, err := os.OpenFile(a.config.Circuit.SolidityVerifierPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
