@@ -6,7 +6,8 @@ type Config struct {
 }
 
 type EthereumConfig struct {
-	Host string `json:"host"`
+	Host       string `json:"host"`
+	PrivateKey string `json:"privateKey"`
 }
 
 type LoggerConfig struct {

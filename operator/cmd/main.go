@@ -61,9 +61,12 @@ func main() {
 
 	operator.SetLogger(log)
 
-	app := operator.NewApp()
+	app := operator.NewApp(&config)
 
-	app.Run()
+	err = app.Run()
+	if err != nil {
+		log.Fatalf("running app: %v", err)
+	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
