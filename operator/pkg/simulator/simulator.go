@@ -79,7 +79,7 @@ func (s *Simulator) Run() error {
 		senderConstraints := sender.Constraints()
 		senders[i] = senderConstraints
 
-		transfer := operator.NewTransfer(10, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64())
+		transfer := operator.NewTransfer(10, 2, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64())
 		_, msg, err := transfer.Sign(*privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
 		if err != nil {
 			return fmt.Errorf("failed to sign transfer: %v", err)
@@ -175,7 +175,12 @@ func (s *Simulator) UpdateState(state *operator.State, leaf uint64, t operator.T
 
 	amount := big.NewInt(0)
 	t.Amount.BigInt(amount)
-	sender.Balance.Sub(sender.Balance, amount)
+
+	fee := big.NewInt(0)
+	t.Fee.BigInt(fee)
+
+	sum := big.NewInt(0).Add(amount, fee)
+	sender.Balance.Sub(sender.Balance, sum)
 
 	err = state.WriteAccount(sender)
 	if err != nil {

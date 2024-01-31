@@ -13,15 +13,17 @@ type Transfer struct {
 	Amount         fr.Element
 	SenderPubKey   eddsa.PublicKey
 	ReceiverPubKey eddsa.PublicKey
+	Fee            fr.Element
 	Signature      eddsa.Signature
 }
 
-func NewTransfer(amount uint64, from, to eddsa.PublicKey, nonce uint64) Transfer {
+func NewTransfer(amount, fee uint64, from, to eddsa.PublicKey, nonce uint64) Transfer {
 
 	var res Transfer
 
 	res.Nonce = nonce
 	res.Amount.SetUint64(amount)
+	res.Fee.SetUint64(fee)
 	res.SenderPubKey = from
 	res.ReceiverPubKey = to
 
@@ -39,6 +41,7 @@ func (t *Transfer) Constraints() TransferConstraints {
 
 	return TransferConstraints{
 		Nonce:          t.Nonce,
+		Fee:            t.Fee,
 		Amount:         t.Amount,
 		SenderPubKey:   senderPubKey,
 		ReceiverPubKey: receiverPubKey,
@@ -55,6 +58,8 @@ func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []
 	b := frNonce.Bytes()
 	_, _ = h.Write(b[:])
 	b = t.Amount.Bytes()
+	_, _ = h.Write(b[:])
+	b = t.Fee.Bytes()
 	_, _ = h.Write(b[:])
 	b = t.SenderPubKey.A.X.Bytes()
 	_, _ = h.Write(b[:])

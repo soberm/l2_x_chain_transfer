@@ -38,6 +38,7 @@ type AccountConstraints struct {
 
 type TransferConstraints struct {
 	Amount         frontend.Variable
+	Fee            frontend.Variable
 	Nonce          frontend.Variable
 	SenderPubKey   eddsa.PublicKey
 	ReceiverPubKey eddsa.PublicKey
@@ -83,7 +84,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 		api.AssertIsEqual(circuit.Sender[i].PubKey.A.Y, circuit.Transfers[i].SenderPubKey.A.Y)
 
 		hFunc.Reset()
-		hFunc.Write(circuit.Transfers[i].Nonce, circuit.Transfers[i].Amount, circuit.Transfers[i].SenderPubKey.A.X, circuit.Transfers[i].SenderPubKey.A.Y, circuit.Transfers[i].ReceiverPubKey.A.X, circuit.Transfers[i].ReceiverPubKey.A.Y)
+		hFunc.Write(circuit.Transfers[i].Nonce, circuit.Transfers[i].Amount, circuit.Transfers[i].Fee, circuit.Transfers[i].SenderPubKey.A.X, circuit.Transfers[i].SenderPubKey.A.Y, circuit.Transfers[i].ReceiverPubKey.A.X, circuit.Transfers[i].ReceiverPubKey.A.Y)
 
 		api.AssertIsEqual(circuit.MerkleProofTransfers[i].Path[0], hFunc.Sum())
 		api.AssertIsEqual(circuit.MerkleProofTransfers[i].RootHash, circuit.TransactionsRoot)
@@ -95,10 +96,11 @@ func (circuit *Circuit) Define(api frontend.API) error {
 			return fmt.Errorf("failed to verify transfer signature: %v", err)
 		}
 
-		api.AssertIsLessOrEqual(circuit.Transfers[i].Amount, circuit.Sender[i].Balance)
+		sum := api.Add(circuit.Transfers[i].Amount, circuit.Transfers[i].Fee)
+		api.AssertIsLessOrEqual(sum, circuit.Sender[i].Balance)
 
 		circuit.Sender[i].Nonce = api.Add(circuit.Sender[i].Nonce, 1)
-		circuit.Sender[i].Balance = api.Sub(circuit.Sender[i].Balance, circuit.Transfers[i].Amount)
+		circuit.Sender[i].Balance = api.Sub(circuit.Sender[i].Balance, sum)
 
 		hFunc.Reset()
 		hFunc.Write(circuit.Sender[i].Index, circuit.Sender[i].Nonce, circuit.Sender[i].PubKey.A.X, circuit.Sender[i].PubKey.A.Y, circuit.Sender[i].Balance)
@@ -121,7 +123,7 @@ func verifyTransferSignature(api frontend.API, t TransferConstraints, hFunc mimc
 
 	hFunc.Reset()
 
-	hFunc.Write(t.Nonce, t.Amount, t.SenderPubKey.A.X, t.SenderPubKey.A.Y, t.ReceiverPubKey.A.X, t.ReceiverPubKey.A.Y)
+	hFunc.Write(t.Nonce, t.Amount, t.Fee, t.SenderPubKey.A.X, t.SenderPubKey.A.Y, t.ReceiverPubKey.A.X, t.ReceiverPubKey.A.Y)
 	hTransfer := hFunc.Sum()
 
 	hFunc.Reset()
