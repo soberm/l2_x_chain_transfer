@@ -1,7 +1,10 @@
 package operator
 
 import (
+	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa"
+	tedwards "github.com/consensys/gnark-crypto/ecc/twistededwards"
+	eddsa2 "github.com/consensys/gnark/std/signature/eddsa"
 	"math/big"
 )
 
@@ -12,6 +15,18 @@ type Account struct {
 	Nonce     *big.Int
 	PublicKey *eddsa.PublicKey
 	Balance   *big.Int
+}
+
+func (a *Account) Constraints() AccountConstraints {
+	var pubKey eddsa2.PublicKey
+	pubKey.Assign(tedwards.ID(ecc.BN254), a.PublicKey.Bytes())
+
+	return AccountConstraints{
+		Index:   a.Index,
+		Nonce:   a.Nonce,
+		Balance: a.Balance,
+		PubKey:  pubKey,
+	}
 }
 
 func (a *Account) Serialize() []byte {
@@ -39,4 +54,20 @@ func (a *Account) Serialize() []byte {
 	serialized = append(serialized, paddedBalance...)
 
 	return serialized
+}
+
+func (a *Account) Deserialize(data []byte) {
+
+	a.Index = big.NewInt(0).SetBytes(data[:32])
+	a.Nonce = big.NewInt(0).SetBytes(data[32:64])
+
+	a.PublicKey = new(eddsa.PublicKey)
+
+	a.PublicKey.A.X.SetZero()
+	a.PublicKey.A.Y.SetOne()
+
+	a.PublicKey.A.X.SetBytes(data[64:96])
+	a.PublicKey.A.Y.SetBytes(data[96:128])
+
+	a.Balance = big.NewInt(0).SetBytes(data[128:accountSize])
 }
