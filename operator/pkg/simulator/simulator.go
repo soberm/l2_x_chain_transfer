@@ -23,7 +23,7 @@ func (s *Simulator) Run() error {
 	log.Info("starting simulator")
 
 	var circuit operator.Circuit
-	circuit.MerkleProofSender.Path = make([]frontend.Variable, 3)
+	circuit.AllocateSlicesMerkleProofs()
 
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {
@@ -60,32 +60,43 @@ func (s *Simulator) Run() error {
 	}
 	log.Infof("PreStateRoot: %v", big.NewInt(0).SetBytes(preStateRoot))
 
-	transfer := operator.NewTransfer(10, privateKeys[0].PublicKey, privateKeys[1].PublicKey, 1)
-	_, err = transfer.Sign(*privateKeys[0], mimc.NewMiMC())
-	if err != nil {
-		return fmt.Errorf("failed to sign transfer: %v", err)
-	}
+	var senders [operator.BatchSize]operator.AccountConstraints
+	var merkleProofs [operator.BatchSize]merkle.MerkleProof
+	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
 
-	sender, err := state.ReadAccount(0)
-	if err != nil {
-		return fmt.Errorf("read account: %w", err)
-	}
+	for i := 0; i < operator.BatchSize; i++ {
+		sender, err := state.ReadAccount(1)
+		if err != nil {
+			return fmt.Errorf("read account: %w", err)
+		}
 
-	senderConstraints := sender.Constraints()
+		senderConstraints := sender.Constraints()
+		senders[i] = senderConstraints
 
-	root, merkleProof, err := state.MerkleProof(accounts[0].Index.Uint64())
-	if err != nil {
-		return fmt.Errorf("create state: %w", err)
-	}
+		transfer := operator.NewTransfer(10, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64())
+		_, err = transfer.Sign(*privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
+		if err != nil {
+			return fmt.Errorf("failed to sign transfer: %v", err)
+		}
 
-	senderMerkleProof := merkle.MerkleProof{
-		RootHash: root,
-		Path:     merkleProof,
-	}
+		root, merkleProof, err := state.MerkleProof(sender.Index.Uint64())
+		if err != nil {
+			return fmt.Errorf("create state: %w", err)
+		}
 
-	err = s.UpdateState(state, transfer)
-	if err != nil {
-		return fmt.Errorf("failed to update state: %v", err)
+		senderMerkleProof := merkle.MerkleProof{
+			RootHash: root,
+			Path:     merkleProof,
+		}
+
+		merkleProofs[i] = senderMerkleProof
+
+		transfersConstraints[i] = transfer.Constraints()
+
+		err = s.UpdateState(state, sender.Index.Uint64(), transfer)
+		if err != nil {
+			return fmt.Errorf("failed to update state: %v", err)
+		}
 	}
 
 	postStateRoot, err := state.Root()
@@ -94,12 +105,10 @@ func (s *Simulator) Run() error {
 	}
 	log.Infof("PostStateRoot: %v", big.NewInt(0).SetBytes(postStateRoot))
 
-	transferConstraints := transfer.Constraints()
-
 	assignment := operator.Circuit{
-		Sender:            senderConstraints,
-		MerkleProofSender: senderMerkleProof,
-		Transfer:          transferConstraints,
+		Sender:            senders,
+		MerkleProofSender: merkleProofs,
+		Transfers:         transfersConstraints,
 		PreStateRoot:      preStateRoot,
 		PostStateRoot:     postStateRoot,
 	}
@@ -121,9 +130,9 @@ func (s *Simulator) Run() error {
 	return nil
 }
 
-func (s *Simulator) UpdateState(state *operator.State, t operator.Transfer) error {
+func (s *Simulator) UpdateState(state *operator.State, leaf uint64, t operator.Transfer) error {
 
-	sender, err := state.ReadAccount(0)
+	sender, err := state.ReadAccount(leaf)
 	if err != nil {
 		log.Fatalf("failed to read account: %v", err)
 	}

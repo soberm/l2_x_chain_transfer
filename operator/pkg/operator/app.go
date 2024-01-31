@@ -113,7 +113,7 @@ func (a *App) CompileCircuit() error {
 	log.Info("constraint system not found, compiling circuit...")
 
 	var circuit Circuit
-	circuit.MerkleProofSender.Path = make([]frontend.Variable, depth)
+	circuit.AllocateSlicesMerkleProofs()
 
 	a.ccs, err = frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 	if err != nil {

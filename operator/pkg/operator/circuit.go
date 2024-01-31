@@ -11,17 +11,17 @@ import (
 )
 
 const (
-	nbAccounts       = 4
-	depth            = 3
-	BatchSizeCircuit = 1
+	nbAccounts = 4
+	depth      = 3
+	BatchSize  = 2
 )
 
 type Circuit struct {
-	Sender AccountConstraints
+	Sender [BatchSize]AccountConstraints
 
-	MerkleProofSender merkle.MerkleProof
+	MerkleProofSender [BatchSize]merkle.MerkleProof
 
-	Transfer TransferConstraints
+	Transfers [BatchSize]TransferConstraints
 
 	PreStateRoot  frontend.Variable `gnark:",public"`
 	PostStateRoot frontend.Variable `gnark:",public"`
@@ -43,6 +43,14 @@ type TransferConstraints struct {
 	//	Destination    frontend.Variable
 }
 
+func (circuit *Circuit) AllocateSlicesMerkleProofs() {
+
+	for i := 0; i < BatchSize; i++ {
+		circuit.MerkleProofSender[i].Path = make([]frontend.Variable, depth)
+	}
+
+}
+
 func (circuit *Circuit) Define(api frontend.API) error {
 
 	hFunc, err := mimc.NewMiMC(api)
@@ -50,26 +58,44 @@ func (circuit *Circuit) Define(api frontend.API) error {
 		return err
 	}
 
-	api.AssertIsEqual(circuit.MerkleProofSender.RootHash, circuit.PreStateRoot)
+	intermediateRoot := circuit.PreStateRoot
+	for i := 0; i < BatchSize; i++ {
 
-	circuit.MerkleProofSender.VerifyProof(api, &hFunc, circuit.Sender.Index)
-	err = verifyTransferSignature(api, circuit.Transfer, hFunc)
-	if err != nil {
-		return fmt.Errorf("failed to verify transfer signature: %v", err)
+		/*		api.Println("Sender: ", circuit.Sender[i].Index)
+				api.Println("Nonce: ", circuit.Sender[i].Nonce)
+				api.Println("Sender balance: ", circuit.Sender[i].Balance)
+				api.Println("Sender PubKey X: ", circuit.Sender[i].PubKey.A.X)
+				api.Println("Sender PubKey Y: ", circuit.Sender[i].PubKey.A.Y)*/
+
+		hFunc.Reset()
+		hFunc.Write(circuit.Sender[i].Index, circuit.Sender[i].Nonce, circuit.Sender[i].PubKey.A.X, circuit.Sender[i].PubKey.A.Y, circuit.Sender[i].Balance)
+
+		api.AssertIsEqual(circuit.MerkleProofSender[i].Path[0], hFunc.Sum())
+		api.AssertIsEqual(circuit.MerkleProofSender[i].RootHash, intermediateRoot)
+
+		circuit.MerkleProofSender[i].VerifyProof(api, &hFunc, circuit.Sender[i].Index)
+
+		api.AssertIsEqual(circuit.Sender[i].Nonce, circuit.Transfers[i].Nonce)
+		api.AssertIsEqual(circuit.Sender[i].PubKey.A.X, circuit.Transfers[i].SenderPubKey.A.X)
+		api.AssertIsEqual(circuit.Sender[i].PubKey.A.Y, circuit.Transfers[i].SenderPubKey.A.Y)
+
+		err = verifyTransferSignature(api, circuit.Transfers[i], hFunc)
+		if err != nil {
+			return fmt.Errorf("failed to verify transfer signature: %v", err)
+		}
+
+		api.AssertIsLessOrEqual(circuit.Transfers[i].Amount, circuit.Sender[i].Balance)
+
+		circuit.Sender[i].Nonce = api.Add(circuit.Sender[i].Nonce, 1)
+		circuit.Sender[i].Balance = api.Sub(circuit.Sender[i].Balance, circuit.Transfers[i].Amount)
+
+		hFunc.Reset()
+		hFunc.Write(circuit.Sender[i].Index, circuit.Sender[i].Nonce, circuit.Sender[i].PubKey.A.X, circuit.Sender[i].PubKey.A.Y, circuit.Sender[i].Balance)
+		circuit.MerkleProofSender[i].Path[0] = hFunc.Sum()
+
+		intermediateRoot = ComputeRootFromPath(api, &circuit.MerkleProofSender[i], &hFunc, circuit.Sender[i].Index)
 	}
 
-	circuit.Sender.Nonce = api.Add(circuit.Sender.Nonce, 1)
-	api.AssertIsEqual(circuit.Sender.Nonce, circuit.Transfer.Nonce)
-
-	api.AssertIsLessOrEqual(circuit.Transfer.Amount, circuit.Sender.Balance)
-
-	circuit.Sender.Balance = api.Sub(circuit.Sender.Balance, circuit.Transfer.Amount)
-
-	hFunc.Reset()
-	hFunc.Write(circuit.Sender.Index, circuit.Sender.Nonce, circuit.Sender.PubKey.A.X, circuit.Sender.PubKey.A.Y, circuit.Sender.Balance)
-	circuit.MerkleProofSender.Path[0] = hFunc.Sum()
-
-	intermediateRoot := ComputeRootFromPath(api, &circuit.MerkleProofSender, &hFunc, circuit.Sender.Index)
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
 
 	return nil

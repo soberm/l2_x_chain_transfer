@@ -12,7 +12,7 @@ func generatePrivateKeys(number int) ([]*eddsa.PrivateKey, error) {
 	privateKeys := make([]*eddsa.PrivateKey, number)
 	for i := 0; i < number; i++ {
 		//r := rand.New(rand.NewSource(time.Now().UnixNano()))
-		r := rand.New(rand.NewSource(0))
+		r := rand.New(rand.NewSource(int64(i)))
 		sk, err := eddsa.GenerateKey(r)
 		if err != nil {
 			return nil, fmt.Errorf("eddsa generate key: %w", err)
