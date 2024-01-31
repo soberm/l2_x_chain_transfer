@@ -19,12 +19,14 @@ const (
 type Circuit struct {
 	Sender [BatchSize]AccountConstraints
 
-	MerkleProofSender [BatchSize]merkle.MerkleProof
+	MerkleProofSender    [BatchSize]merkle.MerkleProof
+	MerkleProofTransfers [BatchSize]merkle.MerkleProof
 
 	Transfers [BatchSize]TransferConstraints
 
-	PreStateRoot  frontend.Variable `gnark:",public"`
-	PostStateRoot frontend.Variable `gnark:",public"`
+	PreStateRoot     frontend.Variable `gnark:",public"`
+	PostStateRoot    frontend.Variable `gnark:",public"`
+	TransactionsRoot frontend.Variable `gnark:",public"`
 }
 
 type AccountConstraints struct {
@@ -47,6 +49,7 @@ func (circuit *Circuit) AllocateSlicesMerkleProofs() {
 
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofSender[i].Path = make([]frontend.Variable, depth)
+		circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, 2)
 	}
 
 }
@@ -79,6 +82,14 @@ func (circuit *Circuit) Define(api frontend.API) error {
 		api.AssertIsEqual(circuit.Sender[i].PubKey.A.X, circuit.Transfers[i].SenderPubKey.A.X)
 		api.AssertIsEqual(circuit.Sender[i].PubKey.A.Y, circuit.Transfers[i].SenderPubKey.A.Y)
 
+		hFunc.Reset()
+		hFunc.Write(circuit.Transfers[i].Nonce, circuit.Transfers[i].Amount, circuit.Transfers[i].SenderPubKey.A.X, circuit.Transfers[i].SenderPubKey.A.Y, circuit.Transfers[i].ReceiverPubKey.A.X, circuit.Transfers[i].ReceiverPubKey.A.Y)
+
+		api.AssertIsEqual(circuit.MerkleProofTransfers[i].Path[0], hFunc.Sum())
+		api.AssertIsEqual(circuit.MerkleProofTransfers[i].RootHash, circuit.TransactionsRoot)
+
+		circuit.MerkleProofTransfers[i].VerifyProof(api, &hFunc, i)
+
 		err = verifyTransferSignature(api, circuit.Transfers[i], hFunc)
 		if err != nil {
 			return fmt.Errorf("failed to verify transfer signature: %v", err)
@@ -102,20 +113,21 @@ func (circuit *Circuit) Define(api frontend.API) error {
 }
 
 func verifyTransferSignature(api frontend.API, t TransferConstraints, hFunc mimc.MiMC) error {
-	hFunc.Reset()
-
-	hFunc.Write(t.Nonce, t.Amount, t.SenderPubKey.A.X, t.SenderPubKey.A.Y, t.ReceiverPubKey.A.X, t.ReceiverPubKey.A.Y)
-	htransfer := hFunc.Sum()
 
 	curve, err := twistededwards.NewEdCurve(api, tedwards.BN254)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create twisted edwards curve: %v", err)
 	}
 
 	hFunc.Reset()
-	err = eddsa.Verify(curve, t.Signature, htransfer, t.SenderPubKey, &hFunc)
+
+	hFunc.Write(t.Nonce, t.Amount, t.SenderPubKey.A.X, t.SenderPubKey.A.Y, t.ReceiverPubKey.A.X, t.ReceiverPubKey.A.Y)
+	hTransfer := hFunc.Sum()
+
+	hFunc.Reset()
+	err = eddsa.Verify(curve, t.Signature, hTransfer, t.SenderPubKey, &hFunc)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to verify signature: %v", err)
 	}
 	return nil
 }

@@ -46,7 +46,7 @@ func (t *Transfer) Constraints() TransferConstraints {
 	}
 }
 
-func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, error) {
+func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []byte, error) {
 
 	h.Reset()
 	var frNonce fr.Element
@@ -68,12 +68,12 @@ func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, er
 
 	sigBin, err := priv.Sign(msg, h)
 	if err != nil {
-		return eddsa.Signature{}, err
+		return eddsa.Signature{}, nil, err
 	}
 	var sig eddsa.Signature
 	if _, err := sig.SetBytes(sigBin); err != nil {
-		return eddsa.Signature{}, err
+		return eddsa.Signature{}, nil, err
 	}
 	t.Signature = sig
-	return sig, nil
+	return sig, msg, nil
 }

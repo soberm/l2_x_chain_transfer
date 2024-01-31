@@ -1,7 +1,10 @@
 package simulator
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"github.com/consensys/gnark-crypto/accumulator/merkletree"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
 	"github.com/consensys/gnark/backend/groth16"
@@ -64,6 +67,9 @@ func (s *Simulator) Run() error {
 	var merkleProofs [operator.BatchSize]merkle.MerkleProof
 	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
 
+	hFunc := mimc.NewMiMC()
+	transactionData := make([]byte, hFunc.Size()*operator.BatchSize)
+
 	for i := 0; i < operator.BatchSize; i++ {
 		sender, err := state.ReadAccount(1)
 		if err != nil {
@@ -74,7 +80,7 @@ func (s *Simulator) Run() error {
 		senders[i] = senderConstraints
 
 		transfer := operator.NewTransfer(10, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64())
-		_, err = transfer.Sign(*privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
+		_, msg, err := transfer.Sign(*privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
 		if err != nil {
 			return fmt.Errorf("failed to sign transfer: %v", err)
 		}
@@ -93,10 +99,37 @@ func (s *Simulator) Run() error {
 
 		transfersConstraints[i] = transfer.Constraints()
 
+		copy(transactionData[i*hFunc.Size():(i+1)*hFunc.Size()], msg)
+
 		err = s.UpdateState(state, sender.Index.Uint64(), transfer)
 		if err != nil {
 			return fmt.Errorf("failed to update state: %v", err)
 		}
+	}
+
+	var transactionMerkleProofs [operator.BatchSize]merkle.MerkleProof
+	for i := 0; i < operator.BatchSize; i++ {
+		var txBuf bytes.Buffer
+		_, err = txBuf.Write(transactionData)
+		if err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+		root, proof, numLeaves, _ := merkletree.BuildReaderProof(&txBuf, hFunc, hFunc.Size(), uint64(i))
+		if !merkletree.VerifyProof(hFunc, root, proof, uint64(i), numLeaves) {
+			return errors.New("invalid merkle proof")
+		}
+
+		var path []frontend.Variable
+		for j := 0; j < len(proof); j++ {
+			path = append(path, proof[j])
+		}
+
+		transactionMerkleProof := merkle.MerkleProof{
+			RootHash: root,
+			Path:     path,
+		}
+
+		transactionMerkleProofs[i] = transactionMerkleProof
 	}
 
 	postStateRoot, err := state.Root()
@@ -106,11 +139,13 @@ func (s *Simulator) Run() error {
 	log.Infof("PostStateRoot: %v", big.NewInt(0).SetBytes(postStateRoot))
 
 	assignment := operator.Circuit{
-		Sender:            senders,
-		MerkleProofSender: merkleProofs,
-		Transfers:         transfersConstraints,
-		PreStateRoot:      preStateRoot,
-		PostStateRoot:     postStateRoot,
+		Sender:               senders,
+		MerkleProofSender:    merkleProofs,
+		MerkleProofTransfers: transactionMerkleProofs,
+		Transfers:            transfersConstraints,
+		PreStateRoot:         preStateRoot,
+		PostStateRoot:        postStateRoot,
+		TransactionsRoot:     transactionMerkleProofs[0].RootHash,
 	}
 
 	witness, _ := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
