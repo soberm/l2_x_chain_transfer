@@ -15,9 +15,10 @@ type Transfer struct {
 	ReceiverPubKey eddsa.PublicKey
 	Fee            fr.Element
 	Signature      eddsa.Signature
+	Destination    fr.Element
 }
 
-func NewTransfer(amount, fee uint64, from, to eddsa.PublicKey, nonce uint64) Transfer {
+func NewTransfer(amount, fee uint64, from, to eddsa.PublicKey, nonce uint64, destination uint64) Transfer {
 
 	var res Transfer
 
@@ -26,6 +27,7 @@ func NewTransfer(amount, fee uint64, from, to eddsa.PublicKey, nonce uint64) Tra
 	res.Fee.SetUint64(fee)
 	res.SenderPubKey = from
 	res.ReceiverPubKey = to
+	res.Destination.SetUint64(destination)
 
 	return res
 }
@@ -46,6 +48,7 @@ func (t *Transfer) Constraints() TransferConstraints {
 		SenderPubKey:   senderPubKey,
 		ReceiverPubKey: receiverPubKey,
 		Signature:      sig,
+		Destination:    t.Destination,
 	}
 }
 
@@ -68,6 +71,8 @@ func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []
 	b = t.ReceiverPubKey.A.X.Bytes()
 	_, _ = h.Write(b[:])
 	b = t.ReceiverPubKey.A.Y.Bytes()
+	_, _ = h.Write(b[:])
+	b = t.Destination.Bytes()
 	_, _ = h.Write(b[:])
 	msg := h.Sum([]byte{})
 

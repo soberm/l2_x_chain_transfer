@@ -79,7 +79,7 @@ func (s *Simulator) Run() error {
 		senderConstraints := sender.Constraints()
 		senders[i] = senderConstraints
 
-		transfer := operator.NewTransfer(10, 2, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64())
+		transfer := operator.NewTransfer(2, 1, privateKeys[sender.Index.Uint64()].PublicKey, privateKeys[sender.Index.Uint64()].PublicKey, sender.Nonce.Uint64(), 1)
 		_, msg, err := transfer.Sign(*privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
 		if err != nil {
 			return fmt.Errorf("failed to sign transfer: %v", err)
@@ -146,6 +146,7 @@ func (s *Simulator) Run() error {
 		PreStateRoot:         preStateRoot,
 		PostStateRoot:        postStateRoot,
 		TransactionsRoot:     transactionMerkleProofs[0].RootHash,
+		Blockchains:          [operator.NumberBlockchains]frontend.Variable{1},
 	}
 
 	witness, _ := frontend.NewWitness(&assignment, ecc.BN254.ScalarField())
