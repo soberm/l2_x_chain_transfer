@@ -22,7 +22,7 @@ const (
 	BlockchainID      = 0
 )
 
-type Circuit struct {
+type BurnCircuit struct {
 	Sender [BatchSize]AccountConstraints
 
 	MerkleProofSender    [BatchSize]merkle.MerkleProof
@@ -65,7 +65,7 @@ func (t *TransferConstraints) Hash(h hash.FieldHasher) frontend.Variable {
 	return h.Sum()
 }
 
-func (circuit *Circuit) AllocateSlicesMerkleProofs() {
+func (circuit *BurnCircuit) AllocateSlicesMerkleProofs() {
 
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofSender[i].Path = make([]frontend.Variable, StateTreeDepth)
@@ -74,7 +74,7 @@ func (circuit *Circuit) AllocateSlicesMerkleProofs() {
 
 }
 
-func (circuit *Circuit) Define(api frontend.API) error {
+func (circuit *BurnCircuit) Define(api frontend.API) error {
 
 	hFunc, err := mimc.NewMiMC(api)
 	if err != nil {
@@ -129,7 +129,7 @@ func (circuit *Circuit) Define(api frontend.API) error {
 	return nil
 }
 
-func (circuit *Circuit) verifyTransferSignature(api frontend.API, t TransferConstraints, hFunc mimc.MiMC) error {
+func (circuit *BurnCircuit) verifyTransferSignature(api frontend.API, t TransferConstraints, hFunc mimc.MiMC) error {
 	api.Println("Verifying signature...")
 	curve, err := twistededwards.NewEdCurve(api, tedwards.BN254)
 	if err != nil {
@@ -146,7 +146,7 @@ func (circuit *Circuit) verifyTransferSignature(api frontend.API, t TransferCons
 	return nil
 }
 
-func (circuit *Circuit) burn(api frontend.API, t *TransferConstraints, a *AccountConstraints) {
+func (circuit *BurnCircuit) burn(api frontend.API, t *TransferConstraints, a *AccountConstraints) {
 	api.Println("Burning tokens...")
 	sum := api.Add(t.Amount, t.Fee)
 	api.AssertIsLessOrEqual(sum, a.Balance)

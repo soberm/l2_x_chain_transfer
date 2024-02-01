@@ -25,7 +25,7 @@ func NewSimulator() *Simulator {
 func (s *Simulator) Run() error {
 	log.Info("starting simulator")
 
-	var circuit operator.Circuit
+	var circuit operator.BurnCircuit
 	circuit.AllocateSlicesMerkleProofs()
 
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
@@ -71,7 +71,7 @@ func (s *Simulator) Run() error {
 	transactionData := make([]byte, hFunc.Size()*operator.BatchSize)
 
 	for i := 0; i < operator.BatchSize; i++ {
-		sender, err := state.ReadAccount(1)
+		sender, err := state.ReadAccount(uint64(i))
 		if err != nil {
 			return fmt.Errorf("read account: %w", err)
 		}
@@ -138,7 +138,7 @@ func (s *Simulator) Run() error {
 	}
 	log.Infof("PostStateRoot: %v", big.NewInt(0).SetBytes(postStateRoot))
 
-	assignment := operator.Circuit{
+	assignment := operator.BurnCircuit{
 		Sender:               senders,
 		MerkleProofSender:    merkleProofs,
 		MerkleProofTransfers: transactionMerkleProofs,
