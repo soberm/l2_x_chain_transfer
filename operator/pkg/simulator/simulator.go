@@ -41,7 +41,7 @@ func (s *Simulator) Run() error {
 	log.Info("circuit setup completed")
 
 	log.Infof("Generate private keys")
-	privateKeys, err := generatePrivateKeys(4)
+	privateKeys, err := generatePrivateKeys(operator.NumberAccounts)
 	if err != nil {
 		return fmt.Errorf("setup circuit: %w", err)
 	}

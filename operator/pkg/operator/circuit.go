@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	nbAccounts     = 4
+	NumberAccounts = 4
 	StateTreeDepth = 3
 
 	BatchSize             = 2
