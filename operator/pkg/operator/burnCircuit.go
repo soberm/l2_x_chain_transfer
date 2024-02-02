@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	NumberAccounts = 4
-	StateTreeDepth = 3
+	NumberAccounts = 256
+	StateTreeDepth = 9
 
 	BatchSize             = 2
 	TransactionsTreeDepth = 2

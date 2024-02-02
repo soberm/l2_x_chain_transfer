@@ -7,6 +7,8 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"operator/pkg/operator"
+	"runtime"
+	"time"
 )
 
 type Simulator struct {
@@ -31,23 +33,30 @@ func (s *Simulator) Run() error {
 	}
 	log.Info("burn circuit compiled")
 
-	claimCS, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &claimCircuit)
-	if err != nil {
-		return fmt.Errorf("compile burnCircuit: %w", err)
-	}
-	log.Info("claim circuit compiled")
+	/*	claimCS, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &claimCircuit)
+		if err != nil {
+			return fmt.Errorf("compile burnCircuit: %w", err)
+		}
+		log.Info("claim circuit compiled")*/
 
+	var m1, m2 runtime.MemStats
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
 	pk, vk, err := groth16.Setup(ccs)
 	if err != nil {
 		return fmt.Errorf("setup burn circuit: %w", err)
 	}
 	log.Info("burn circuit setup completed")
+	runtime.ReadMemStats(&m2)
 
-	_, _, err = groth16.Setup(claimCS)
-	if err != nil {
-		return fmt.Errorf("setup claim circuit: %w", err)
-	}
-	log.Info("claim circuit setup completed")
+	pkMemory := m2.TotalAlloc - m1.TotalAlloc
+
+	/*	_, _, err = groth16.Setup(claimCS)
+		if err != nil {
+			return fmt.Errorf("setup claim circuit: %w", err)
+		}
+		log.Info("claim circuit setup completed")*/
 
 	rollup, err := NewRollup()
 	if err != nil {
@@ -66,10 +75,19 @@ func (s *Simulator) Run() error {
 
 	publicWitness, _ := witness.Public()
 
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+
+	start := time.Now()
 	proof, err := groth16.Prove(ccs, pk, witness)
 	if err != nil {
 		return fmt.Errorf("failed to generate proof: %v", err)
 	}
+	provingTime := time.Since(start)
+	runtime.ReadMemStats(&m2)
+
+	log.Infof("Proving Time: %v", provingTime)
+	log.Infof("Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemory))
 
 	err = groth16.Verify(proof, vk, publicWitness)
 	if err != nil {
