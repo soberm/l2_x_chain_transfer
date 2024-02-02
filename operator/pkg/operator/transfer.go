@@ -52,8 +52,7 @@ func (t *Transfer) Constraints() TransferConstraints {
 	}
 }
 
-func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []byte, error) {
-
+func (t *Transfer) Hash(h hash.Hash) []byte {
 	h.Reset()
 	var frNonce fr.Element
 
@@ -74,7 +73,14 @@ func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []
 	_, _ = h.Write(b[:])
 	b = t.Destination.Bytes()
 	_, _ = h.Write(b[:])
-	msg := h.Sum([]byte{})
+
+	return h.Sum([]byte{})
+}
+
+func (t *Transfer) Sign(priv eddsa.PrivateKey, h hash.Hash) (eddsa.Signature, []byte, error) {
+
+	h.Reset()
+	msg := t.Hash(h)
 
 	sigBin, err := priv.Sign(msg, h)
 	if err != nil {

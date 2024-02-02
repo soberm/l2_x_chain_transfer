@@ -22,9 +22,9 @@ func (a *Account) Constraints() AccountConstraints {
 	pubKey.Assign(tedwards.ID(ecc.BN254), a.PublicKey.Bytes())
 
 	return AccountConstraints{
-		Index:   a.Index,
-		Nonce:   a.Nonce,
-		Balance: a.Balance,
+		Index:   big.NewInt(0).Set(a.Index),
+		Nonce:   big.NewInt(0).Set(a.Nonce),
+		Balance: big.NewInt(0).Set(a.Balance),
 		PubKey:  pubKey,
 	}
 }

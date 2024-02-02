@@ -83,8 +83,8 @@ func (circuit *BurnCircuit) Define(api frontend.API) error {
 
 	intermediateRoot := circuit.PreStateRoot
 	for i := 0; i < BatchSize; i++ {
-		api.Println("Executing transfer ", i, "...")
-		/*		api.Println("Sender: ", circuit.Sender[i].Index)
+		/*		api.Println("Executing transfer ", i, "...")
+				api.Println("Sender: ", circuit.Sender[i].Index)
 				api.Println("Nonce: ", circuit.Sender[i].Nonce)
 				api.Println("Sender balance: ", circuit.Sender[i].Balance)
 				api.Println("Sender PubKey X: ", circuit.Sender[i].PubKey.A.X)

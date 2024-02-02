@@ -40,3 +40,15 @@ func ComputeRootFromPath(api frontend.API, mp *merkle.MerkleProof, h hash.FieldH
 
 	return sum
 }
+
+func MerkleProofToConstraints(root []byte, proofSet [][]byte) merkle.MerkleProof {
+	var path []frontend.Variable
+	for j := 0; j < len(proofSet); j++ {
+		path = append(path, proofSet[j])
+	}
+
+	return merkle.MerkleProof{
+		RootHash: root,
+		Path:     path,
+	}
+}

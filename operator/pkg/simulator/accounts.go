@@ -29,7 +29,7 @@ func createAccounts(privateKeys []*eddsa.PrivateKey) ([]*operator.Account, error
 			Index:     big.NewInt(int64(i)),
 			Nonce:     big.NewInt(0),
 			PublicKey: &privateKey.PublicKey,
-			Balance:   big.NewInt(100),
+			Balance:   big.NewInt(1000000),
 		}
 	}
 	return accounts, nil
