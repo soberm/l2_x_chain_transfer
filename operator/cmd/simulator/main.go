@@ -18,7 +18,7 @@ func init() {
 
 func main() {
 	simulator.SetLogger(log)
-	sim := simulator.NewSimulator()
+	sim := simulator.NewSimulator(50)
 	err := sim.Run()
 	if err != nil {
 		log.Fatalf("run simulator: %v", err)

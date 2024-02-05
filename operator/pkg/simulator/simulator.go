@@ -1,6 +1,7 @@
 package simulator
 
 import (
+	"encoding/csv"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend"
@@ -9,15 +10,20 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"operator/pkg/operator"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 )
 
 type Simulator struct {
+	runs int
 }
 
-func NewSimulator() *Simulator {
-	return &Simulator{}
+func NewSimulator(runs int) *Simulator {
+	return &Simulator{
+		runs: runs,
+	}
 }
 
 func (s *Simulator) Run() error {
@@ -40,6 +46,27 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("compile claim circuit: %w", err)
 	}
 	log.Info("claim circuit compiled")
+
+	file, err := os.Create("data.csv")
+	if err != nil {
+		return fmt.Errorf("create data file: %w", err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
+
+	headerRow := []string{
+		"run",
+		"batchSize",
+		"provingTimeBurn",
+		"memoryUsageBurn",
+		"provingTimeClaim",
+		"memoryUsageClaim",
+	}
+
+	data := [][]string{
+		headerRow,
+	}
 
 	var m1, m2 runtime.MemStats
 
@@ -65,74 +92,86 @@ func (s *Simulator) Run() error {
 
 	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
 
-	/*	_, _, err = groth16.Setup(claimCS)
+	for i := 0; i < s.runs; i++ {
+		measurement := make([]string, 0)
+		measurement = append(measurement, strconv.Itoa(i))
+		measurement = append(measurement, strconv.Itoa(operator.BatchSize))
+
+		rollup, err := NewRollup()
 		if err != nil {
-			return fmt.Errorf("setup claim circuit: %w", err)
+			return fmt.Errorf("create rollup: %w", err)
 		}
-		log.Info("claim circuit setup completed")*/
 
-	rollup, err := NewRollup()
-	if err != nil {
-		return fmt.Errorf("create rollup: %w", err)
+		transfers, err := rollup.GenerateTransfers(operator.BatchSize)
+		if err != nil {
+			return fmt.Errorf("generate transactions: %w", err)
+		}
+
+		witness, err := rollup.Burn(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ := witness.Public()
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start := time.Now()
+		proof, err := groth16.Prove(ccs, pk, witness)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime := time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		measurement = append(measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		measurement = append(measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))))
+		log.Infof("Burn Proving Time: %v", provingTime)
+		log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
+
+		err = groth16.Verify(proof, vk, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		witness, err = rollup.Claim(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ = witness.Public()
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start = time.Now()
+		proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
+		proof, err = groth16.Prove(ccsClaim, pkClaim, witness, proverOption)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime = time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		log.Infof("Claim Proving Time: %v", provingTime)
+		log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
+		measurement = append(measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		measurement = append(measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
+
+		err = groth16.Verify(proof, vkClaim, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		data = append(data, measurement)
 	}
 
-	transfers, err := rollup.GenerateTransfers(operator.BatchSize)
+	err = csvWriter.WriteAll(data)
 	if err != nil {
-		return fmt.Errorf("generate transactions: %w", err)
+		return fmt.Errorf("write data to file: %w", err)
 	}
-
-	witness, err := rollup.Burn(transfers)
-	if err != nil {
-		return fmt.Errorf("update state: %w", err)
-	}
-
-	publicWitness, _ := witness.Public()
-
-	runtime.GC()
-	runtime.ReadMemStats(&m1)
-
-	start := time.Now()
-	proof, err := groth16.Prove(ccs, pk, witness)
-	if err != nil {
-		return fmt.Errorf("failed to generate proof: %v", err)
-	}
-	provingTime := time.Since(start)
-	runtime.ReadMemStats(&m2)
-
-	log.Infof("Burn Proving Time: %v", provingTime)
-	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
-
-	err = groth16.Verify(proof, vk, publicWitness)
-	if err != nil {
-		return fmt.Errorf("failed to verify proof: %v", err)
-	}
-
-	witness, err = rollup.Claim(transfers)
-	if err != nil {
-		return fmt.Errorf("update state: %w", err)
-	}
-
-	publicWitness, _ = witness.Public()
-
-	runtime.GC()
-	runtime.ReadMemStats(&m1)
-
-	start = time.Now()
-	proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
-	proof, err = groth16.Prove(ccsClaim, pkClaim, witness, proverOption)
-	if err != nil {
-		return fmt.Errorf("failed to generate proof: %v", err)
-	}
-	provingTime = time.Since(start)
-	runtime.ReadMemStats(&m2)
-
-	log.Infof("Claim Proving Time: %v", provingTime)
-	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
-
-	err = groth16.Verify(proof, vkClaim, publicWitness)
-	if err != nil {
-		return fmt.Errorf("failed to verify proof: %v", err)
-	}
+	csvWriter.Flush()
 
 	log.Info("stop simulator")
 	return nil
