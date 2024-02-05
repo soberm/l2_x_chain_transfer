@@ -149,8 +149,10 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 
 	var receiverConstraints [operator.BatchSize]operator.AccountConstraints
 	var sourceOperatorConstraints [operator.BatchSize]operator.AccountConstraints
+	var targetOperatorConstraints [operator.BatchSize]operator.AccountConstraints
 	var receiverMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var sourceOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
+	var targetOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
 	var transactionMerkleProofs [operator.BatchSize]merkle.MerkleProof
 
@@ -207,6 +209,28 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to write account: %v", err)
 		}
+
+		targetOperator, err := r.State.ReadAccount(operator.NumberAccounts - 2)
+		if err != nil {
+			return nil, fmt.Errorf("read account: %w", err)
+		}
+
+		targetOperatorConstraints[i] = targetOperator.Constraints()
+
+		root, targetOperatorMerkleProof, err := r.State.MerkleProof(targetOperator.Index.Uint64())
+		if err != nil {
+			return nil, fmt.Errorf("create state: %w", err)
+		}
+
+		targetOperatorMerkleProofs[i] = merkle.MerkleProof{
+			RootHash: root,
+			Path:     targetOperatorMerkleProof,
+		}
+
+		err = r.UpdateOperator(&targetOperator, &transfers[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to write account: %v", err)
+		}
 	}
 
 	postStateRoot, err := r.State.Root()
@@ -215,17 +239,17 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 	}
 
 	assignment := &operator.ClaimCircuit{
-		Receiver:       receiverConstraints,
-		SourceOperator: sourceOperatorConstraints,
-		//TargetOperator:            operator.AccountConstraints{},
+		Receiver:                  receiverConstraints,
+		SourceOperator:            sourceOperatorConstraints,
+		TargetOperator:            targetOperatorConstraints,
 		MerkleProofSourceOperator: sourceOperatorMerkleProofs,
-		//MerkleProofTargetOperator: merkle.MerkleProof{},
-		MerkleProofReceiver:  receiverMerkleProofs,
-		MerkleProofTransfers: transactionMerkleProofs,
-		Transfers:            transfersConstraints,
-		PreStateRoot:         preStateRoot,
-		PostStateRoot:        postStateRoot,
-		TransactionsRoot:     transferMerkleProofs[0].RootHash,
+		MerkleProofTargetOperator: targetOperatorMerkleProofs,
+		MerkleProofReceiver:       receiverMerkleProofs,
+		MerkleProofTransfers:      transactionMerkleProofs,
+		Transfers:                 transfersConstraints,
+		PreStateRoot:              preStateRoot,
+		PostStateRoot:             postStateRoot,
+		TransactionsRoot:          transferMerkleProofs[0].RootHash,
 	}
 
 	w, err := frontend.NewWitness(assignment, ecc.BN254.ScalarField())

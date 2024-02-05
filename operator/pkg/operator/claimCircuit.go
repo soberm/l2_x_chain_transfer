@@ -10,12 +10,12 @@ import (
 type ClaimCircuit struct {
 	Receiver       [BatchSize]AccountConstraints
 	SourceOperator [BatchSize]AccountConstraints
-	//TargetOperator AccountConstraints
+	TargetOperator [BatchSize]AccountConstraints
 
 	MerkleProofSourceOperator [BatchSize]merkle.MerkleProof
-	//MerkleProofTargetOperator merkle.MerkleProof
-	MerkleProofReceiver  [BatchSize]merkle.MerkleProof
-	MerkleProofTransfers [BatchSize]merkle.MerkleProof
+	MerkleProofTargetOperator [BatchSize]merkle.MerkleProof
+	MerkleProofReceiver       [BatchSize]merkle.MerkleProof
+	MerkleProofTransfers      [BatchSize]merkle.MerkleProof
 
 	Transfers [BatchSize]TransferConstraints
 
@@ -26,10 +26,9 @@ type ClaimCircuit struct {
 
 func (circuit *ClaimCircuit) AllocateSlicesMerkleProofs() {
 
-	//circuit.MerkleProofTargetOperator.Path = make([]frontend.Variable, StateTreeDepth)
-
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofSourceOperator[i].Path = make([]frontend.Variable, StateTreeDepth)
+		circuit.MerkleProofTargetOperator[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofReceiver[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
 	}
@@ -59,7 +58,7 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 
 		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.SourceOperator[i], &circuit.MerkleProofSourceOperator[i])
 
-		//intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
+		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator[i], &circuit.MerkleProofTargetOperator[i])
 	}
 
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
