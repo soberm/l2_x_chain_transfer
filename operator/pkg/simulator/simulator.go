@@ -3,7 +3,9 @@ package simulator
 import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"operator/pkg/operator"
@@ -108,7 +110,8 @@ func (s *Simulator) Run() error {
 	publicWitness, _ = witness.Public()
 
 	start = time.Now()
-	proof, err = groth16.Prove(ccsClaim, pkClaim, witness)
+	proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
+	proof, err = groth16.Prove(ccsClaim, pkClaim, witness, proverOption)
 	if err != nil {
 		return fmt.Errorf("failed to generate proof: %v", err)
 	}
