@@ -8,11 +8,11 @@ import (
 )
 
 type ClaimCircuit struct {
-	Receiver [BatchSize]AccountConstraints
-	//SourceOperator AccountConstraints
+	Receiver       [BatchSize]AccountConstraints
+	SourceOperator [BatchSize]AccountConstraints
 	//TargetOperator AccountConstraints
 
-	//MerkleProofSourceOperator merkle.MerkleProof
+	MerkleProofSourceOperator [BatchSize]merkle.MerkleProof
 	//MerkleProofTargetOperator merkle.MerkleProof
 	MerkleProofReceiver  [BatchSize]merkle.MerkleProof
 	MerkleProofTransfers [BatchSize]merkle.MerkleProof
@@ -26,10 +26,10 @@ type ClaimCircuit struct {
 
 func (circuit *ClaimCircuit) AllocateSlicesMerkleProofs() {
 
-	//circuit.MerkleProofSourceOperator.Path = make([]frontend.Variable, StateTreeDepth)
 	//circuit.MerkleProofTargetOperator.Path = make([]frontend.Variable, StateTreeDepth)
 
 	for i := 0; i < BatchSize; i++ {
+		circuit.MerkleProofSourceOperator[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofReceiver[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
 	}
@@ -54,15 +54,14 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 				api.Println("Sender balance: ", circuit.Receiver[i].Balance)
 				api.Println("Sender PubKey X: ", circuit.Receiver[i].PubKey.A.X)
 				api.Println("Sender PubKey Y: ", circuit.Receiver[i].PubKey.A.Y)*/
-		api.Println("Intermediate root: ", intermediateRoot)
+
 		intermediateRoot = circuit.claim(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.Receiver[i], &circuit.MerkleProofReceiver[i])
 
-		//intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
+		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.SourceOperator[i], &circuit.MerkleProofSourceOperator[i])
 
 		//intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
 	}
-	api.Println("Intermediate root: ", intermediateRoot)
-	api.Println("Post state root: ", circuit.PostStateRoot)
+
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
 
 	return nil
@@ -94,11 +93,16 @@ func (circuit *ClaimCircuit) claim(api frontend.API, hFunc hash.FieldHasher, roo
 func (circuit *ClaimCircuit) rewardOperator(api frontend.API, hFunc hash.FieldHasher, root frontend.Variable, t *TransferConstraints, a *AccountConstraints, merkleProof *merkle.MerkleProof) frontend.Variable {
 	api.Println("Rewarding operator...")
 
+	result, err := api.Compiler().NewHint(Div, 1, t.Fee, 2)
+	if err != nil {
+		return err
+	}
+
 	api.AssertIsEqual(merkleProof.RootHash, root)
 	api.AssertIsEqual(merkleProof.Path[0], a.Hash(hFunc))
 	merkleProof.VerifyProof(api, hFunc, a.Index)
 
-	a.Balance = api.Add(a.Balance, t.Fee)
+	a.Balance = api.Add(a.Balance, result[0])
 	merkleProof.Path[0] = a.Hash(hFunc)
 
 	return ComputeRootFromPath(api, merkleProof, hFunc, a.Index)

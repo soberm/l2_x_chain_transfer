@@ -3,7 +3,9 @@ package simulator
 import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"operator/pkg/operator"
@@ -50,13 +52,18 @@ func (s *Simulator) Run() error {
 	log.Info("burn circuit setup completed")
 	runtime.ReadMemStats(&m2)
 
+	pkMemoryBurn := m2.TotalAlloc - m1.TotalAlloc
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
 	pkClaim, vkClaim, err := groth16.Setup(ccsClaim)
 	if err != nil {
 		return fmt.Errorf("setup claim circuit: %w", err)
 	}
 	log.Info("claim circuit setup completed")
+	runtime.ReadMemStats(&m2)
 
-	pkMemory := m2.TotalAlloc - m1.TotalAlloc
+	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
 
 	/*	_, _, err = groth16.Setup(claimCS)
 		if err != nil {
@@ -93,7 +100,7 @@ func (s *Simulator) Run() error {
 	runtime.ReadMemStats(&m2)
 
 	log.Infof("Burn Proving Time: %v", provingTime)
-	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemory))
+	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
 
 	err = groth16.Verify(proof, vk, publicWitness)
 	if err != nil {
@@ -107,14 +114,20 @@ func (s *Simulator) Run() error {
 
 	publicWitness, _ = witness.Public()
 
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+
 	start = time.Now()
-	proof, err = groth16.Prove(ccsClaim, pkClaim, witness)
+	proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
+	proof, err = groth16.Prove(ccsClaim, pkClaim, witness, proverOption)
 	if err != nil {
 		return fmt.Errorf("failed to generate proof: %v", err)
 	}
 	provingTime = time.Since(start)
+	runtime.ReadMemStats(&m2)
 
 	log.Infof("Claim Proving Time: %v", provingTime)
+	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
 
 	err = groth16.Verify(proof, vkClaim, publicWitness)
 	if err != nil {
