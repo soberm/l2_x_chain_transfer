@@ -8,14 +8,14 @@ import (
 )
 
 type ClaimCircuit struct {
-	Receiver       [BatchSize]AccountConstraints
-	SourceOperator AccountConstraints
-	TargetOperator AccountConstraints
+	Receiver [BatchSize]AccountConstraints
+	//SourceOperator AccountConstraints
+	//TargetOperator AccountConstraints
 
-	MerkleProofSourceOperator merkle.MerkleProof
-	MerkleProofTargetOperator merkle.MerkleProof
-	MerkleProofReceiver       [BatchSize]merkle.MerkleProof
-	MerkleProofTransfers      [BatchSize]merkle.MerkleProof
+	//MerkleProofSourceOperator merkle.MerkleProof
+	//MerkleProofTargetOperator merkle.MerkleProof
+	MerkleProofReceiver  [BatchSize]merkle.MerkleProof
+	MerkleProofTransfers [BatchSize]merkle.MerkleProof
 
 	Transfers [BatchSize]TransferConstraints
 
@@ -26,8 +26,8 @@ type ClaimCircuit struct {
 
 func (circuit *ClaimCircuit) AllocateSlicesMerkleProofs() {
 
-	circuit.MerkleProofSourceOperator.Path = make([]frontend.Variable, StateTreeDepth)
-	circuit.MerkleProofTargetOperator.Path = make([]frontend.Variable, StateTreeDepth)
+	//circuit.MerkleProofSourceOperator.Path = make([]frontend.Variable, StateTreeDepth)
+	//circuit.MerkleProofTargetOperator.Path = make([]frontend.Variable, StateTreeDepth)
 
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofReceiver[i].Path = make([]frontend.Variable, StateTreeDepth)
@@ -48,20 +48,27 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 
 		circuit.transferIncluded(api, &hFunc, &circuit.Transfers[i], &circuit.Receiver[i], &circuit.MerkleProofTransfers[i], i)
 
+		/*		api.Println("Executing transfer ", i, "...")
+				api.Println("Sender: ", circuit.Receiver[i].Index)
+				api.Println("Nonce: ", circuit.Receiver[i].Nonce)
+				api.Println("Sender balance: ", circuit.Receiver[i].Balance)
+				api.Println("Sender PubKey X: ", circuit.Receiver[i].PubKey.A.X)
+				api.Println("Sender PubKey Y: ", circuit.Receiver[i].PubKey.A.Y)*/
+		api.Println("Intermediate root: ", intermediateRoot)
 		intermediateRoot = circuit.claim(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.Receiver[i], &circuit.MerkleProofReceiver[i])
 
-		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
+		//intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
 
-		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
+		//intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
 	}
-
+	api.Println("Intermediate root: ", intermediateRoot)
+	api.Println("Post state root: ", circuit.PostStateRoot)
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
 
 	return nil
 }
 
 func (circuit *ClaimCircuit) transferIncluded(api frontend.API, hFunc hash.FieldHasher, t *TransferConstraints, a *AccountConstraints, merkleProof *merkle.MerkleProof, index int) {
-	api.AssertIsEqual(a.Nonce, t.Nonce)
 	api.AssertIsEqual(a.PubKey.A.X, t.SenderPubKey.A.X)
 	api.AssertIsEqual(a.PubKey.A.Y, t.SenderPubKey.A.Y)
 

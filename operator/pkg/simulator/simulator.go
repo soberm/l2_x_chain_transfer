@@ -29,15 +29,15 @@ func (s *Simulator) Run() error {
 
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &burnCircuit)
 	if err != nil {
-		return fmt.Errorf("compile burnCircuit: %w", err)
+		return fmt.Errorf("compile burn circuit: %w", err)
 	}
 	log.Info("burn circuit compiled")
 
-	/*	claimCS, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &claimCircuit)
-		if err != nil {
-			return fmt.Errorf("compile burnCircuit: %w", err)
-		}
-		log.Info("claim circuit compiled")*/
+	ccsClaim, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &claimCircuit)
+	if err != nil {
+		return fmt.Errorf("compile claim circuit: %w", err)
+	}
+	log.Info("claim circuit compiled")
 
 	var m1, m2 runtime.MemStats
 
@@ -49,6 +49,12 @@ func (s *Simulator) Run() error {
 	}
 	log.Info("burn circuit setup completed")
 	runtime.ReadMemStats(&m2)
+
+	pkClaim, vkClaim, err := groth16.Setup(ccsClaim)
+	if err != nil {
+		return fmt.Errorf("setup claim circuit: %w", err)
+	}
+	log.Info("claim circuit setup completed")
 
 	pkMemory := m2.TotalAlloc - m1.TotalAlloc
 
@@ -68,7 +74,7 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("generate transactions: %w", err)
 	}
 
-	witness, err := rollup.UpdateState(transfers)
+	witness, err := rollup.Burn(transfers)
 	if err != nil {
 		return fmt.Errorf("update state: %w", err)
 	}
@@ -86,10 +92,31 @@ func (s *Simulator) Run() error {
 	provingTime := time.Since(start)
 	runtime.ReadMemStats(&m2)
 
-	log.Infof("Proving Time: %v", provingTime)
-	log.Infof("Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemory))
+	log.Infof("Burn Proving Time: %v", provingTime)
+	log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemory))
 
 	err = groth16.Verify(proof, vk, publicWitness)
+	if err != nil {
+		return fmt.Errorf("failed to verify proof: %v", err)
+	}
+
+	witness, err = rollup.Claim(transfers)
+	if err != nil {
+		return fmt.Errorf("update state: %w", err)
+	}
+
+	publicWitness, _ = witness.Public()
+
+	start = time.Now()
+	proof, err = groth16.Prove(ccsClaim, pkClaim, witness)
+	if err != nil {
+		return fmt.Errorf("failed to generate proof: %v", err)
+	}
+	provingTime = time.Since(start)
+
+	log.Infof("Claim Proving Time: %v", provingTime)
+
+	err = groth16.Verify(proof, vkClaim, publicWitness)
 	if err != nil {
 		return fmt.Errorf("failed to verify proof: %v", err)
 	}
