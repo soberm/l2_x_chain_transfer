@@ -2,7 +2,6 @@ package simulator
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/consensys/gnark-crypto/accumulator/merkletree"
 	"github.com/consensys/gnark-crypto/ecc"
@@ -82,14 +81,11 @@ func (r *Rollup) Burn(transfers []operator.Transfer) (witness.Witness, error) {
 	var senderConstraints [operator.BatchSize]operator.AccountConstraints
 	var senderMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
-	var transactionMerkleProofs [operator.BatchSize]merkle.MerkleProof
 
-	transferMerkleProofs, err := r.TransferMerkleProofs(transfers)
+	transfersRoot, err := r.TransfersRoot(transfers)
 	if err != nil {
 		return nil, fmt.Errorf("generate transactions: %w", err)
 	}
-
-	copy(transactionMerkleProofs[:], transferMerkleProofs[:operator.BatchSize])
 
 	for i := 0; i < len(transfers); i++ {
 		sender, err := r.State.ReadAccount(uint64(i))
@@ -123,14 +119,13 @@ func (r *Rollup) Burn(transfers []operator.Transfer) (witness.Witness, error) {
 	}
 
 	assignment := &operator.BurnCircuit{
-		Sender:               senderConstraints,
-		MerkleProofSender:    senderMerkleProofs,
-		MerkleProofTransfers: transactionMerkleProofs,
-		Transfers:            transfersConstraints,
-		PreStateRoot:         preStateRoot,
-		PostStateRoot:        postStateRoot,
-		TransactionsRoot:     transferMerkleProofs[0].RootHash,
-		Blockchains:          [operator.NumberBlockchains]frontend.Variable{1},
+		Sender:            senderConstraints,
+		MerkleProofSender: senderMerkleProofs,
+		Transfers:         transfersConstraints,
+		PreStateRoot:      preStateRoot,
+		PostStateRoot:     postStateRoot,
+		TransactionsRoot:  transfersRoot,
+		Blockchains:       [operator.NumberBlockchains]frontend.Variable{1},
 	}
 
 	w, err := frontend.NewWitness(assignment, ecc.BN254.ScalarField())
@@ -154,14 +149,11 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 	var sourceOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var targetOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
-	var transactionMerkleProofs [operator.BatchSize]merkle.MerkleProof
 
-	transferMerkleProofs, err := r.TransferMerkleProofs(transfers)
+	transfersRoot, err := r.TransfersRoot(transfers)
 	if err != nil {
 		return nil, fmt.Errorf("generate transactions: %w", err)
 	}
-
-	copy(transactionMerkleProofs[:], transferMerkleProofs[:operator.BatchSize])
 
 	for i := 0; i < len(transfers); i++ {
 		transfersConstraints[i] = transfers[i].Constraints()
@@ -245,11 +237,10 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		MerkleProofSourceOperator: sourceOperatorMerkleProofs,
 		MerkleProofTargetOperator: targetOperatorMerkleProofs,
 		MerkleProofReceiver:       receiverMerkleProofs,
-		MerkleProofTransfers:      transactionMerkleProofs,
 		Transfers:                 transfersConstraints,
 		PreStateRoot:              preStateRoot,
 		PostStateRoot:             postStateRoot,
-		TransactionsRoot:          transferMerkleProofs[0].RootHash,
+		TransactionsRoot:          transfersRoot,
 	}
 
 	w, err := frontend.NewWitness(assignment, ecc.BN254.ScalarField())
@@ -260,7 +251,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 	return w, nil
 }
 
-func (r *Rollup) TransferMerkleProofs(transfers []operator.Transfer) ([]merkle.MerkleProof, error) {
+func (r *Rollup) TransfersRoot(transfers []operator.Transfer) ([]byte, error) {
 	hFunc := mimc.NewMiMC()
 	transferData := make([]byte, hFunc.Size()*len(transfers))
 
@@ -268,24 +259,18 @@ func (r *Rollup) TransferMerkleProofs(transfers []operator.Transfer) ([]merkle.M
 		copy(transferData[i*hFunc.Size():(i+1)*hFunc.Size()], transfers[i].Hash(hFunc))
 	}
 
-	transactionMerkleProofs := make([]merkle.MerkleProof, 0)
-	for i := 0; i < operator.BatchSize; i++ {
-
-		var txBuf bytes.Buffer
-		_, err := txBuf.Write(transferData)
-		if err != nil {
-			return nil, fmt.Errorf("write: %w", err)
-		}
-
-		root, proof, numLeaves, _ := merkletree.BuildReaderProof(&txBuf, hFunc, hFunc.Size(), uint64(i))
-		if !merkletree.VerifyProof(hFunc, root, proof, uint64(i), numLeaves) {
-			return nil, errors.New("invalid merkle proof")
-		}
-
-		transactionMerkleProofs = append(transactionMerkleProofs, operator.MerkleProofToConstraints(root, proof))
+	var buf bytes.Buffer
+	_, err := buf.Write(transferData)
+	if err != nil {
+		return nil, fmt.Errorf("write: %w", err)
 	}
 
-	return transactionMerkleProofs, nil
+	root, err := merkletree.ReaderRoot(&buf, hFunc, hFunc.Size())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transfer root: %v", err)
+	}
+
+	return root, nil
 }
 
 func (r *Rollup) UpdateSender(account *operator.Account, transfer *operator.Transfer) error {

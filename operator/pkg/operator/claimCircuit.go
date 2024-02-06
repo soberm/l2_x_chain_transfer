@@ -15,7 +15,6 @@ type ClaimCircuit struct {
 	MerkleProofSourceOperator [BatchSize]merkle.MerkleProof
 	MerkleProofTargetOperator [BatchSize]merkle.MerkleProof
 	MerkleProofReceiver       [BatchSize]merkle.MerkleProof
-	MerkleProofTransfers      [BatchSize]merkle.MerkleProof
 
 	Transfers [BatchSize]TransferConstraints
 
@@ -30,7 +29,6 @@ func (circuit *ClaimCircuit) AllocateSlicesMerkleProofs() {
 		circuit.MerkleProofSourceOperator[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofTargetOperator[i].Path = make([]frontend.Variable, StateTreeDepth)
 		circuit.MerkleProofReceiver[i].Path = make([]frontend.Variable, StateTreeDepth)
-		circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
 	}
 }
 
@@ -42,10 +40,12 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 	}
 
 	intermediateRoot := circuit.PreStateRoot
+
+	leaves := make([]frontend.Variable, BatchSize)
 	for i := 0; i < BatchSize; i++ {
 		api.AssertIsEqual(circuit.Transfers[i].Destination, BlockchainID)
 
-		circuit.transferIncluded(api, &hFunc, &circuit.Transfers[i], &circuit.Receiver[i], &circuit.MerkleProofTransfers[i], i)
+		leaves[i] = circuit.Transfers[i].Hash(&hFunc)
 
 		/*		api.Println("Executing transfer ", i, "...")
 				api.Println("Sender: ", circuit.Receiver[i].Index)
@@ -60,6 +60,10 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 
 		intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.TargetOperator[i], &circuit.MerkleProofTargetOperator[i])
 	}
+
+	transactionsRoot := ComputeRoot(api, &hFunc, leaves)
+
+	api.AssertIsEqual(transactionsRoot, circuit.TransactionsRoot)
 
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
 
