@@ -15,8 +15,7 @@ const (
 	NumberAccounts = 256
 	StateTreeDepth = 9
 
-	BatchSize             = 2
-	TransactionsTreeDepth = 2
+	BatchSize = 2
 
 	NumberBlockchains = 1
 	BlockchainID      = 0
@@ -25,8 +24,8 @@ const (
 type BurnCircuit struct {
 	Sender [BatchSize]AccountConstraints
 
-	MerkleProofSender    [BatchSize]merkle.MerkleProof
-	MerkleProofTransfers [BatchSize]merkle.MerkleProof
+	MerkleProofSender [BatchSize]merkle.MerkleProof
+	//MerkleProofTransfers [BatchSize]merkle.MerkleProof
 
 	Transfers [BatchSize]TransferConstraints
 
@@ -69,7 +68,7 @@ func (circuit *BurnCircuit) AllocateSlicesMerkleProofs() {
 
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofSender[i].Path = make([]frontend.Variable, StateTreeDepth)
-		circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
+		//circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
 	}
 
 }
@@ -82,6 +81,8 @@ func (circuit *BurnCircuit) Define(api frontend.API) error {
 	}
 
 	intermediateRoot := circuit.PreStateRoot
+
+	leaves := make([]frontend.Variable, BatchSize)
 	for i := 0; i < BatchSize; i++ {
 		/*		api.Println("Executing transfer ", i, "...")
 				api.Println("Sender: ", circuit.Sender[i].Index)
@@ -89,6 +90,8 @@ func (circuit *BurnCircuit) Define(api frontend.API) error {
 				api.Println("Sender balance: ", circuit.Sender[i].Balance)
 				api.Println("Sender PubKey X: ", circuit.Sender[i].PubKey.A.X)
 				api.Println("Sender PubKey Y: ", circuit.Sender[i].PubKey.A.Y)*/
+
+		leaves[i] = circuit.Transfers[i].Hash(&hFunc)
 
 		isContained := 0
 		for blockchain := range circuit.Blockchains {
@@ -107,10 +110,10 @@ func (circuit *BurnCircuit) Define(api frontend.API) error {
 		api.AssertIsEqual(circuit.Sender[i].PubKey.A.X, circuit.Transfers[i].SenderPubKey.A.X)
 		api.AssertIsEqual(circuit.Sender[i].PubKey.A.Y, circuit.Transfers[i].SenderPubKey.A.Y)
 
-		api.AssertIsEqual(circuit.MerkleProofTransfers[i].Path[0], circuit.Transfers[i].Hash(&hFunc))
-		api.AssertIsEqual(circuit.MerkleProofTransfers[i].RootHash, circuit.TransactionsRoot)
+		//api.AssertIsEqual(circuit.MerkleProofTransfers[i].Path[0], circuit.Transfers[i].Hash(&hFunc))
+		//api.AssertIsEqual(circuit.MerkleProofTransfers[i].RootHash, circuit.TransactionsRoot)
 
-		circuit.MerkleProofTransfers[i].VerifyProof(api, &hFunc, i)
+		//circuit.MerkleProofTransfers[i].VerifyProof(api, &hFunc, i)
 
 		err = circuit.verifyTransferSignature(api, circuit.Transfers[i], hFunc)
 		if err != nil {
@@ -123,6 +126,10 @@ func (circuit *BurnCircuit) Define(api frontend.API) error {
 
 		intermediateRoot = ComputeRootFromPath(api, &circuit.MerkleProofSender[i], &hFunc, circuit.Sender[i].Index)
 	}
+
+	transactionsRoot := ComputeRoot(api, &hFunc, leaves)
+
+	api.AssertIsEqual(transactionsRoot, circuit.TransactionsRoot)
 
 	api.AssertIsEqual(intermediateRoot, circuit.PostStateRoot)
 
