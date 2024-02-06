@@ -18,11 +18,13 @@ import (
 
 type Simulator struct {
 	runs int
+	dst  string
 }
 
-func NewSimulator(runs int) *Simulator {
+func NewSimulator(runs int, dst string) *Simulator {
 	return &Simulator{
 		runs: runs,
+		dst:  dst,
 	}
 }
 
@@ -46,14 +48,6 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("compile claim circuit: %w", err)
 	}
 	log.Info("claim circuit compiled")
-
-	file, err := os.Create("data.csv")
-	if err != nil {
-		return fmt.Errorf("create data file: %w", err)
-	}
-	defer file.Close()
-
-	csvWriter := csv.NewWriter(file)
 
 	headerRow := []string{
 		"run",
@@ -166,6 +160,14 @@ func (s *Simulator) Run() error {
 
 		data = append(data, measurement)
 	}
+
+	file, err := os.Create(s.dst)
+	if err != nil {
+		return fmt.Errorf("create data file: %w", err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
 
 	err = csvWriter.WriteAll(data)
 	if err != nil {

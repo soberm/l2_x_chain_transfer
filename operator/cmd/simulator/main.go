@@ -18,7 +18,7 @@ func init() {
 
 func main() {
 	simulator.SetLogger(log)
-	sim := simulator.NewSimulator(1)
+	sim := simulator.NewSimulator(1, "data.csv")
 	err := sim.Run()
 	if err != nil {
 		log.Fatalf("run simulator: %v", err)
