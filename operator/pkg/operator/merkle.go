@@ -24,24 +24,26 @@ func nodeSum(api frontend.API, h hash.FieldHasher, a, b frontend.Variable) front
 
 func ComputeRoot(api frontend.API, h hash.FieldHasher, leaves []frontend.Variable) frontend.Variable {
 
-	if len(leaves) == 1 {
-		return leaves[0]
+	for i := 0; i < len(leaves); i++ {
+		leaves[i] = leafSum(api, h, leaves[i])
 	}
 
-	if len(leaves)%2 != 0 {
-		leaves = append(leaves, leaves[len(leaves)-1])
+	for len(leaves) > 1 {
+		var parentNodes []frontend.Variable
+
+		if len(leaves)%2 != 0 {
+			leaves = append(leaves, leaves[len(leaves)-1])
+		}
+
+		for i := 0; i < len(leaves); i += 2 {
+			nodeHash := nodeSum(api, h, leaves[i], leaves[i+1])
+			parentNodes = append(parentNodes, nodeHash)
+		}
+
+		leaves = parentNodes
 	}
 
-	var parentNodes []frontend.Variable
-	for i := 0; i < len(leaves); i += 2 {
-		left := leafSum(api, h, leaves[i])
-		right := leafSum(api, h, leaves[i+1])
-
-		nodeHash := nodeSum(api, h, left, right)
-		parentNodes = append(parentNodes, nodeHash)
-	}
-
-	return ComputeRoot(api, h, parentNodes)
+	return leaves[0]
 }
 
 func ComputeRootFromPath(api frontend.API, mp *merkle.MerkleProof, h hash.FieldHasher, leaf frontend.Variable) frontend.Variable {

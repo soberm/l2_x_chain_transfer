@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	NumberAccounts = 256
-	StateTreeDepth = 9
+	NumberAccounts = 16
+	StateTreeDepth = 5
 
-	BatchSize = 2
+	BatchSize = 4
 
 	NumberBlockchains = 1
 	BlockchainID      = 0
