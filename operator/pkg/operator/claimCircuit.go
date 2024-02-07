@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"fmt"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/accumulator/merkle"
 	"github.com/consensys/gnark/std/hash"
@@ -43,16 +44,24 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 	intermediateRoot := circuit.PreStateRoot
 
 	leaves := make([]frontend.Variable, BatchSize)
+
+	operatorReward := frontend.Variable(0)
 	for i := 0; i < BatchSize; i++ {
 		api.AssertIsEqual(circuit.Transfers[i].Destination, BlockchainID)
 		leaves[i] = circuit.Transfers[i].Hash(&hFunc)
 
 		intermediateRoot = circuit.claim(api, &hFunc, intermediateRoot, &circuit.Transfers[i], &circuit.Receiver[i], &circuit.MerkleProofReceiver[i])
+
+		result, err := api.Compiler().NewHint(Div, 1, circuit.Transfers[i].Fee, 2)
+		if err != nil {
+			return fmt.Errorf("failed to create hint: %w", err)
+		}
+		operatorReward = api.Add(operatorReward, result[0])
 	}
 
-	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, circuit.Transfers, &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
+	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, operatorReward, &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
 
-	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, circuit.Transfers, &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
+	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, operatorReward, &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)
 
 	transactionsRoot := ComputeRoot(api, &hFunc, leaves)
 
@@ -79,20 +88,14 @@ func (circuit *ClaimCircuit) claim(api frontend.API, hFunc hash.FieldHasher, roo
 	return ComputeRootFromPath(api, merkleProof, hFunc, a.Index)
 }
 
-func (circuit *ClaimCircuit) rewardOperator(api frontend.API, hFunc hash.FieldHasher, root frontend.Variable, t [BatchSize]TransferConstraints, a *AccountConstraints, merkleProof *merkle.MerkleProof) frontend.Variable {
+func (circuit *ClaimCircuit) rewardOperator(api frontend.API, hFunc hash.FieldHasher, root frontend.Variable, reward frontend.Variable, a *AccountConstraints, merkleProof *merkle.MerkleProof) frontend.Variable {
 	api.Println("Rewarding operator...")
 
 	api.AssertIsEqual(merkleProof.RootHash, root)
 	api.AssertIsEqual(merkleProof.Path[0], a.Hash(hFunc))
 	merkleProof.VerifyProof(api, hFunc, a.Index)
 
-	for i := 0; i < BatchSize; i++ {
-		result, err := api.Compiler().NewHint(Div, 1, t[i].Fee, 2)
-		if err != nil {
-			return err
-		}
-		a.Balance = api.Add(a.Balance, result[0])
-	}
+	a.Balance = api.Add(a.Balance, reward)
 
 	merkleProof.Path[0] = a.Hash(hFunc)
 

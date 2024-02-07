@@ -1,6 +1,7 @@
 package simulator
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
@@ -9,6 +10,10 @@ import (
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"math/big"
 	"operator/pkg/operator"
 	"os"
 	"runtime"
@@ -30,6 +35,16 @@ func NewSimulator(runs int, dst string) *Simulator {
 
 func (s *Simulator) Run() error {
 	log.Info("starting simulator")
+
+	ethClient, err := ethclient.DialContext(context.Background(), "ws://127.0.0.1:8545")
+	if err != nil {
+		return fmt.Errorf("dial eth: %w", err)
+	}
+
+	verifierContract, err := operator.NewBurnVerifierContract(common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3"), ethClient)
+	if err != nil {
+		return fmt.Errorf("create verifier contract: %w", err)
+	}
 
 	var burnCircuit operator.BurnCircuit
 	burnCircuit.AllocateSlicesMerkleProofs()
@@ -75,6 +90,16 @@ func (s *Simulator) Run() error {
 
 	pkMemoryBurn := m2.TotalAlloc - m1.TotalAlloc
 
+	solidityBurnVerifierFile, err := os.OpenFile("./BurnVerifier.sol", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer solidityBurnVerifierFile.Close()
+	err = vk.ExportSolidity(solidityBurnVerifierFile)
+	if err != nil {
+		return fmt.Errorf("export solidity verifier: %w", err)
+	}
+
 	runtime.GC()
 	runtime.ReadMemStats(&m1)
 	pkClaim, vkClaim, err := groth16.Setup(ccsClaim)
@@ -86,15 +111,25 @@ func (s *Simulator) Run() error {
 
 	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
 
+	solidityClaimVerifierFile, err := os.OpenFile("./ClaimVerifier.sol", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer solidityClaimVerifierFile.Close()
+	err = vkClaim.ExportSolidity(solidityClaimVerifierFile)
+	if err != nil {
+		return fmt.Errorf("export solidity verifier: %w", err)
+	}
+
+	rollup, err := NewRollup()
+	if err != nil {
+		return fmt.Errorf("create rollup: %w", err)
+	}
+
 	for i := 0; i < s.runs; i++ {
 		measurement := make([]string, 0)
 		measurement = append(measurement, strconv.Itoa(i))
 		measurement = append(measurement, strconv.Itoa(operator.BatchSize))
-
-		rollup, err := NewRollup()
-		if err != nil {
-			return fmt.Errorf("create rollup: %w", err)
-		}
 
 		transfers, err := rollup.GenerateTransfers(operator.BatchSize)
 		if err != nil {
@@ -128,6 +163,23 @@ func (s *Simulator) Run() error {
 		if err != nil {
 			return fmt.Errorf("failed to verify proof: %v", err)
 		}
+
+		ethereumProof, err := operator.ProofToEthereumProof(proof)
+		if err != nil {
+			return fmt.Errorf("convert proof to ethereum proof: %w", err)
+		}
+		log.Infof("Ethereum Proof: %+v", ethereumProof)
+
+		compressedProof, err := verifierContract.CompressProof(&bind.CallOpts{
+			Pending: true,
+			From:    common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"),
+			Context: context.Background(),
+		}, [8]*big.Int{big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)})
+		if err != nil {
+			return fmt.Errorf("compress proof: %w", err)
+		}
+
+		log.Infof("Compressed Ethereum Proof: %+v", compressedProof)
 
 		witness, err = rollup.Claim(transfers)
 		if err != nil {
