@@ -143,11 +143,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 	}
 
 	var receiverConstraints [operator.BatchSize]operator.AccountConstraints
-	var sourceOperatorConstraints [operator.BatchSize]operator.AccountConstraints
-	var targetOperatorConstraints [operator.BatchSize]operator.AccountConstraints
 	var receiverMerkleProofs [operator.BatchSize]merkle.MerkleProof
-	var sourceOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
-	var targetOperatorMerkleProofs [operator.BatchSize]merkle.MerkleProof
 	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
 
 	transfersRoot, err := r.TransfersRoot(transfers)
@@ -155,8 +151,14 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("generate transactions: %w", err)
 	}
 
+	operatorReward := big.NewInt(0)
 	for i := 0; i < len(transfers); i++ {
 		transfersConstraints[i] = transfers[i].Constraints()
+
+		fee := big.NewInt(0)
+		transfers[i].Fee.BigInt(fee)
+		reward := big.NewInt(0).Div(fee, big.NewInt(2))
+		operatorReward.Add(operatorReward, reward)
 
 		receiver, err := r.State.ReadAccount(uint64(i))
 		if err != nil {
@@ -179,50 +181,50 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to write account: %v", err)
 		}
+	}
 
-		sourceOperator, err := r.State.ReadAccount(operator.NumberAccounts - 1)
-		if err != nil {
-			return nil, fmt.Errorf("read account: %w", err)
-		}
+	sourceOperator, err := r.State.ReadAccount(operator.NumberAccounts - 1)
+	if err != nil {
+		return nil, fmt.Errorf("read account: %w", err)
+	}
 
-		sourceOperatorConstraints[i] = sourceOperator.Constraints()
+	sourceOperatorConstraints := sourceOperator.Constraints()
 
-		root, sourceOperatorMerkleProof, err := r.State.MerkleProof(sourceOperator.Index.Uint64())
-		if err != nil {
-			return nil, fmt.Errorf("create state: %w", err)
-		}
+	root, sourceOperatorMerkleProof, err := r.State.MerkleProof(sourceOperator.Index.Uint64())
+	if err != nil {
+		return nil, fmt.Errorf("create state: %w", err)
+	}
 
-		sourceOperatorMerkleProofs[i] = merkle.MerkleProof{
-			RootHash: root,
-			Path:     sourceOperatorMerkleProof,
-		}
+	sourceOperatorMerkleProofConstraints := merkle.MerkleProof{
+		RootHash: root,
+		Path:     sourceOperatorMerkleProof,
+	}
 
-		err = r.UpdateOperator(&sourceOperator, &transfers[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to write account: %v", err)
-		}
+	err = r.UpdateOperator(&sourceOperator, operatorReward)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write account: %v", err)
+	}
 
-		targetOperator, err := r.State.ReadAccount(operator.NumberAccounts - 2)
-		if err != nil {
-			return nil, fmt.Errorf("read account: %w", err)
-		}
+	targetOperator, err := r.State.ReadAccount(operator.NumberAccounts - 2)
+	if err != nil {
+		return nil, fmt.Errorf("read account: %w", err)
+	}
 
-		targetOperatorConstraints[i] = targetOperator.Constraints()
+	targetOperatorConstraints := targetOperator.Constraints()
 
-		root, targetOperatorMerkleProof, err := r.State.MerkleProof(targetOperator.Index.Uint64())
-		if err != nil {
-			return nil, fmt.Errorf("create state: %w", err)
-		}
+	root, targetOperatorMerkleProof, err := r.State.MerkleProof(targetOperator.Index.Uint64())
+	if err != nil {
+		return nil, fmt.Errorf("create state: %w", err)
+	}
 
-		targetOperatorMerkleProofs[i] = merkle.MerkleProof{
-			RootHash: root,
-			Path:     targetOperatorMerkleProof,
-		}
+	targetOperatorMerkleProofConstraints := merkle.MerkleProof{
+		RootHash: root,
+		Path:     targetOperatorMerkleProof,
+	}
 
-		err = r.UpdateOperator(&targetOperator, &transfers[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to write account: %v", err)
-		}
+	err = r.UpdateOperator(&targetOperator, operatorReward)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write account: %v", err)
 	}
 
 	postStateRoot, err := r.State.Root()
@@ -234,8 +236,8 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		Receiver:                  receiverConstraints,
 		SourceOperator:            sourceOperatorConstraints,
 		TargetOperator:            targetOperatorConstraints,
-		MerkleProofSourceOperator: sourceOperatorMerkleProofs,
-		MerkleProofTargetOperator: targetOperatorMerkleProofs,
+		MerkleProofSourceOperator: sourceOperatorMerkleProofConstraints,
+		MerkleProofTargetOperator: targetOperatorMerkleProofConstraints,
 		MerkleProofReceiver:       receiverMerkleProofs,
 		Transfers:                 transfersConstraints,
 		PreStateRoot:              preStateRoot,
@@ -307,12 +309,7 @@ func (r *Rollup) UpdateReceiver(account *operator.Account, transfer *operator.Tr
 	return nil
 }
 
-func (r *Rollup) UpdateOperator(account *operator.Account, transfer *operator.Transfer) error {
-	fee := big.NewInt(0)
-	transfer.Fee.BigInt(fee)
-
-	reward := big.NewInt(0).Div(fee, big.NewInt(2))
-
+func (r *Rollup) UpdateOperator(account *operator.Account, reward *big.Int) error {
 	account.Balance.Add(account.Balance, reward)
 
 	err := r.State.WriteAccount(*account)

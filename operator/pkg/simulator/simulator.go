@@ -149,7 +149,7 @@ func (s *Simulator) Run() error {
 		runtime.ReadMemStats(&m2)
 
 		log.Infof("Claim Proving Time: %v", provingTime)
-		log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
+		log.Infof("Claim Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
 		measurement = append(measurement, strconv.Itoa(int(provingTime.Milliseconds())))
 		measurement = append(measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
 
