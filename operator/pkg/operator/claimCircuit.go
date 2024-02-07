@@ -79,7 +79,7 @@ func (circuit *ClaimCircuit) claim(api frontend.API, hFunc hash.FieldHasher, roo
 	return ComputeRootFromPath(api, merkleProof, hFunc, a.Index)
 }
 
-func (circuit *ClaimCircuit) rewardOperator(api frontend.API, hFunc hash.FieldHasher, root frontend.Variable, t [2]TransferConstraints, a *AccountConstraints, merkleProof *merkle.MerkleProof) frontend.Variable {
+func (circuit *ClaimCircuit) rewardOperator(api frontend.API, hFunc hash.FieldHasher, root frontend.Variable, t [BatchSize]TransferConstraints, a *AccountConstraints, merkleProof *merkle.MerkleProof) frontend.Variable {
 	api.Println("Rewarding operator...")
 
 	api.AssertIsEqual(merkleProof.RootHash, root)
