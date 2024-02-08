@@ -6,6 +6,7 @@ import (
 	tedwards "github.com/consensys/gnark-crypto/ecc/twistededwards"
 	eddsa2 "github.com/consensys/gnark/std/signature/eddsa"
 	"hash"
+	"math/big"
 )
 
 type Transfer struct {
@@ -49,6 +50,49 @@ func (t *Transfer) Constraints() TransferConstraints {
 		ReceiverPubKey: receiverPubKey,
 		Signature:      sig,
 		Destination:    t.Destination,
+	}
+}
+
+func (t *Transfer) RollupTransfer() RollupTransfer {
+
+	nonce := big.NewInt(0)
+	nonce.SetUint64(t.Nonce)
+
+	amount := big.NewInt(0)
+	b := t.Amount.Bytes()
+	amount.SetBytes(b[:])
+
+	senderPubKeyX := big.NewInt(0)
+	b = t.SenderPubKey.A.X.Bytes()
+	senderPubKeyX.SetBytes(b[:])
+
+	senderPubKeyY := big.NewInt(0)
+	b = t.SenderPubKey.A.Y.Bytes()
+	senderPubKeyY.SetBytes(b[:])
+
+	receiverPubKeyX := big.NewInt(0)
+	b = t.ReceiverPubKey.A.X.Bytes()
+	receiverPubKeyX.SetBytes(b[:])
+
+	receiverPubKeyY := big.NewInt(0)
+	b = t.ReceiverPubKey.A.Y.Bytes()
+	receiverPubKeyY.SetBytes(b[:])
+
+	fee := big.NewInt(0)
+	b = t.Fee.Bytes()
+	fee.SetBytes(b[:])
+
+	dest := big.NewInt(0)
+	b = t.Destination.Bytes()
+	dest.SetBytes(b[:])
+
+	return RollupTransfer{
+		Nonce:    nonce,
+		Amount:   amount,
+		Sender:   [2]*big.Int{senderPubKeyX, senderPubKeyY},
+		Receiver: [2]*big.Int{receiverPubKeyX, receiverPubKeyY},
+		Fee:      fee,
+		Dest:     dest,
 	}
 }
 

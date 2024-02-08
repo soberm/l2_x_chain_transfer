@@ -1,15 +1,16 @@
 {
   "runs": 1,
   "dst": "data.csv",
+  "submit": true,
   "Logger": {
     "LogLevel": "info",
     "Format": "text"
   },
   "Ethereum": {
     "host": "http://127.0.0.1:7545",
-    "privateKey": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    "rollupContract": "0xEcb2bddd8FD60eBAd7714Df5F0959BD95b5f50de",
-    "burnVerifierContract": "0xE60Dedcb3f7A40339fbdC57Dd4940a4f906B2A72",
+    "privateKey": "40a22e3e69ce6e6ebd2267567699b3ea90d1553cda128c2b43af69ac83d9c0ed",
+    "rollupContract": "0x1c91BdB08a60e1D525145990a31464b067a0D36F",
+    "burnVerifierContract": "0x52934E45fd1324f547fa4dd5d342da1aA4Cc713e",
     "claimVerifierContract": "0x7F03b7dd883DE62b5c60B37b34Bf68ba020a55Bf"
   },
   "BurnCircuit": {

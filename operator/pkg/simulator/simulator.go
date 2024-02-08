@@ -2,12 +2,14 @@ package simulator
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/csv"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/backend/witness"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -27,6 +29,7 @@ type Simulator struct {
 
 	chainID               *big.Int
 	ethClient             *ethclient.Client
+	privateKey            *ecdsa.PrivateKey
 	burnVerifierContract  *operator.BurnVerifierContract
 	claimVerifierContract *operator.ClaimVerifierContract
 	rollupContract        *operator.RollupContract
@@ -54,6 +57,146 @@ func NewSimulator(config *Config) *Simulator {
 	}
 }
 
+func (s *Simulator) Run() error {
+	log.Info("starting simulator")
+
+	err := s.ConnectEthereum()
+	if err != nil {
+		return fmt.Errorf("connect ethereum: %w", err)
+	}
+
+	err = s.LoadConstraintSystems()
+	if err != nil {
+		return fmt.Errorf("load constraint systems: %w", err)
+	}
+
+	s.rollup, err = NewRollup()
+	if err != nil {
+		return fmt.Errorf("create rollup: %w", err)
+	}
+
+	headerRow := []string{
+		"run",
+		"batchSize",
+		"provingTimeBurn",
+		"memoryUsageBurn",
+		"provingTimeClaim",
+		"memoryUsageClaim",
+	}
+
+	data := [][]string{
+		headerRow,
+	}
+
+	for i := 0; i < s.config.Runs; i++ {
+		s.measurement = make([]string, 0)
+		s.measurement = append(s.measurement, strconv.Itoa(i))
+		s.measurement = append(s.measurement, strconv.Itoa(operator.BatchSize))
+
+		transfers, err := s.rollup.GenerateTransfers(operator.BatchSize)
+		if err != nil {
+			return fmt.Errorf("generate transactions: %w", err)
+		}
+
+		var rollupTransfers [operator.BatchSize]operator.RollupTransfer
+		for j, transfer := range transfers {
+			rollupTransfers[j] = transfer.RollupTransfer()
+		}
+
+		w, err := s.rollup.Burn(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ := w.Public()
+
+		var m1, m2 runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start := time.Now()
+		proof, err := groth16.Prove(s.burnSystem, s.burnProvingKey, w)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime := time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		s.measurement = append(s.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		//s.measurement = append(s.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))))
+		log.Infof("Burn Proving Time: %v", provingTime)
+		//log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
+
+		err = groth16.Verify(proof, s.burnVerifyingKey, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		if s.config.Submit {
+			err = s.SubmitBurnUpdate(proof, w, rollupTransfers)
+			if err != nil {
+				return fmt.Errorf("submit burn update: %w", err)
+			}
+		}
+
+		w, err = s.rollup.Claim(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ = w.Public()
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start = time.Now()
+		proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
+		proof, err = groth16.Prove(s.claimSystem, s.claimProvingKey, w, proverOption)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime = time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		log.Infof("Claim Proving Time: %v", provingTime)
+		//log.Infof("Claim Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
+		s.measurement = append(s.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		//s.measurement = append(s.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
+
+		err = groth16.Verify(proof, s.claimVerifyingKey, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		if s.config.Submit {
+			err = s.SubmitClaimUpdate(proof, w, rollupTransfers)
+			if err != nil {
+				return fmt.Errorf("submit claim update: %w", err)
+			}
+		}
+
+		data = append(data, s.measurement)
+	}
+
+	file, err := os.Create(s.config.Dst)
+	if err != nil {
+		return fmt.Errorf("create data file: %w", err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
+
+	err = csvWriter.WriteAll(data)
+	if err != nil {
+		return fmt.Errorf("write data to file: %w", err)
+	}
+	csvWriter.Flush()
+
+	log.Info("stop simulator")
+	return nil
+}
+
 func (s *Simulator) ConnectEthereum() error {
 	var err error
 	s.ethClient, err = ethclient.DialContext(context.Background(), s.config.Ethereum.Host)
@@ -64,6 +207,11 @@ func (s *Simulator) ConnectEthereum() error {
 	s.chainID, err = s.ethClient.ChainID(context.Background())
 	if err != nil {
 		return fmt.Errorf("chain id: %w", err)
+	}
+
+	s.privateKey, err = crypto.HexToECDSA(s.config.Ethereum.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("ecdsa private key: %w", err)
 	}
 
 	s.burnVerifierContract, err = operator.NewBurnVerifierContract(common.HexToAddress(s.config.Ethereum.BurnVerifierContract), s.ethClient)
@@ -142,185 +290,83 @@ func (s *Simulator) LoadConstraintSystem(constraintSystemPath, provingKeyPath, v
 	return system, pk, vk, nil
 }
 
-func (s *Simulator) Run() error {
-	log.Info("starting simulator")
+func (s *Simulator) ExtractPublicInputs(witness witness.Witness) (*big.Int, *big.Int, *big.Int) {
 
-	err := s.ConnectEthereum()
+	witnessVector := witness.Vector()
+
+	preStateRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
+
+	postStateRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
+
+	transactionsRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
+
+	return preStateRoot, postStateRoot, transactionsRoot
+}
+
+func (s *Simulator) SubmitBurnUpdate(proof groth16.Proof, w witness.Witness, transfers [2]operator.RollupTransfer) error {
+	ethereumProof, err := operator.ProofToEthereumProof(proof)
 	if err != nil {
-		return fmt.Errorf("connect ethereum: %w", err)
+		return fmt.Errorf("convert proof to ethereum proof: %w", err)
 	}
 
-	err = s.LoadConstraintSystems()
+	compressedProof, err := s.burnVerifierContract.CompressProof(nil, ethereumProof)
 	if err != nil {
-		return fmt.Errorf("load constraint systems: %w", err)
+		return fmt.Errorf("compress proof: %w", err)
 	}
 
-	s.rollup, err = NewRollup()
+	auth, err := bind.NewKeyedTransactorWithChainID(s.privateKey, s.chainID)
 	if err != nil {
-		return fmt.Errorf("create rollup: %w", err)
+		return fmt.Errorf("new transactor: %w", err)
 	}
+	auth.GasPrice = big.NewInt(20000000000)
 
-	headerRow := []string{
-		"run",
-		"batchSize",
-		"provingTimeBurn",
-		"memoryUsageBurn",
-		"provingTimeClaim",
-		"memoryUsageClaim",
-	}
+	_, postStateRoot, transactionsRoot := s.ExtractPublicInputs(w)
 
-	data := [][]string{
-		headerRow,
-	}
-
-	for i := 0; i < s.config.Runs; i++ {
-		s.measurement = make([]string, 0)
-		s.measurement = append(s.measurement, strconv.Itoa(i))
-		s.measurement = append(s.measurement, strconv.Itoa(operator.BatchSize))
-
-		transfers, err := s.rollup.GenerateTransfers(operator.BatchSize)
-		if err != nil {
-			return fmt.Errorf("generate transactions: %w", err)
-		}
-
-		witness, err := s.rollup.Burn(transfers)
-		if err != nil {
-			return fmt.Errorf("update state: %w", err)
-		}
-
-		publicWitness, _ := witness.Public()
-
-		witnessVector := publicWitness.Vector()
-
-		preStateRoot := big.NewInt(0)
-		witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
-
-		postStateRoot := big.NewInt(0)
-		witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
-
-		transactionsRoot := big.NewInt(0)
-		witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
-
-		var m1, m2 runtime.MemStats
-
-		runtime.GC()
-		runtime.ReadMemStats(&m1)
-
-		start := time.Now()
-		proof, err := groth16.Prove(s.burnSystem, s.burnProvingKey, witness)
-		if err != nil {
-			return fmt.Errorf("failed to generate proof: %v", err)
-		}
-		provingTime := time.Since(start)
-		runtime.ReadMemStats(&m2)
-
-		s.measurement = append(s.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
-		//s.measurement = append(s.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))))
-		log.Infof("Burn Proving Time: %v", provingTime)
-		//log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
-
-		err = groth16.Verify(proof, s.burnVerifyingKey, publicWitness)
-		if err != nil {
-			return fmt.Errorf("failed to verify proof: %v", err)
-		}
-
-		ethereumProof, err := operator.ProofToEthereumProof(proof)
-		if err != nil {
-			return fmt.Errorf("convert proof to ethereum proof: %w", err)
-		}
-
-		compressedProof, err := s.burnVerifierContract.CompressProof(nil, ethereumProof)
-
-		ecdsaPrivateKey, err := crypto.HexToECDSA("40a22e3e69ce6e6ebd2267567699b3ea90d1553cda128c2b43af69ac83d9c0ed")
-		if err != nil {
-			return fmt.Errorf("ecdsa private key: %w", err)
-		}
-
-		auth, err := bind.NewKeyedTransactorWithChainID(ecdsaPrivateKey, s.chainID)
-		if err != nil {
-			return fmt.Errorf("new transactor: %w", err)
-		}
-		auth.GasPrice = big.NewInt(20000000000)
-
-		tx, err := s.rollupContract.Burn(auth, postStateRoot, transactionsRoot, compressedProof)
-		if err != nil {
-			return fmt.Errorf("submit proof: %w", err)
-		}
-
-		_, err = bind.WaitMined(context.Background(), s.ethClient, tx)
-		if err != nil {
-			return fmt.Errorf("wait mined: %w", err)
-		}
-
-		witness, err = s.rollup.Claim(transfers)
-		if err != nil {
-			return fmt.Errorf("update state: %w", err)
-		}
-
-		publicWitness, _ = witness.Public()
-
-		witnessVector = publicWitness.Vector()
-
-		witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
-		witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
-		witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
-
-		runtime.GC()
-		runtime.ReadMemStats(&m1)
-
-		start = time.Now()
-		proverOption := backend.WithSolverOptions(solver.WithHints(operator.Div))
-		proof, err = groth16.Prove(s.claimSystem, s.claimProvingKey, witness, proverOption)
-		if err != nil {
-			return fmt.Errorf("failed to generate proof: %v", err)
-		}
-		provingTime = time.Since(start)
-		runtime.ReadMemStats(&m2)
-
-		log.Infof("Claim Proving Time: %v", provingTime)
-		//log.Infof("Claim Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
-		s.measurement = append(s.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
-		//s.measurement = append(s.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
-
-		err = groth16.Verify(proof, s.claimVerifyingKey, publicWitness)
-		if err != nil {
-			return fmt.Errorf("failed to verify proof: %v", err)
-		}
-
-		ethereumProof, err = operator.ProofToEthereumProof(proof)
-		if err != nil {
-			return fmt.Errorf("convert proof to ethereum proof: %w", err)
-		}
-
-		compressedProof, err = s.burnVerifierContract.CompressProof(nil, ethereumProof)
-
-		tx, err = s.rollupContract.Claim(auth, postStateRoot, transactionsRoot, compressedProof)
-		if err != nil {
-			return fmt.Errorf("submit proof: %w", err)
-		}
-
-		_, err = bind.WaitMined(context.Background(), s.ethClient, tx)
-		if err != nil {
-			return fmt.Errorf("wait mined: %w", err)
-		}
-
-		data = append(data, s.measurement)
-	}
-
-	file, err := os.Create(s.config.Dst)
+	log.Infof("Transfers: %v", transfers)
+	tx, err := s.rollupContract.Burn(auth, postStateRoot, transactionsRoot, compressedProof, transfers)
 	if err != nil {
-		return fmt.Errorf("create data file: %w", err)
+		return fmt.Errorf("submit burn update: %w", err)
 	}
-	defer file.Close()
 
-	csvWriter := csv.NewWriter(file)
-
-	err = csvWriter.WriteAll(data)
+	_, err = bind.WaitMined(context.Background(), s.ethClient, tx)
 	if err != nil {
-		return fmt.Errorf("write data to file: %w", err)
+		return fmt.Errorf("wait mined: %w", err)
 	}
-	csvWriter.Flush()
 
-	log.Info("stop simulator")
+	return nil
+}
+
+func (s *Simulator) SubmitClaimUpdate(proof groth16.Proof, w witness.Witness, transfers [2]operator.RollupTransfer) error {
+	ethereumProof, err := operator.ProofToEthereumProof(proof)
+	if err != nil {
+		return fmt.Errorf("convert proof to ethereum proof: %w", err)
+	}
+
+	compressedProof, err := s.burnVerifierContract.CompressProof(nil, ethereumProof)
+	if err != nil {
+		return fmt.Errorf("compress proof: %w", err)
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(s.privateKey, s.chainID)
+	if err != nil {
+		return fmt.Errorf("new transactor: %w", err)
+	}
+	auth.GasPrice = big.NewInt(20000000000)
+
+	_, postStateRoot, transactionsRoot := s.ExtractPublicInputs(w)
+
+	tx, err := s.rollupContract.Claim(auth, postStateRoot, transactionsRoot, compressedProof, transfers)
+	if err != nil {
+		return fmt.Errorf("submit claim update: %w", err)
+	}
+
+	_, err = bind.WaitMined(context.Background(), s.ethClient, tx)
+	if err != nil {
+		return fmt.Errorf("wait mined: %w", err)
+	}
+
 	return nil
 }

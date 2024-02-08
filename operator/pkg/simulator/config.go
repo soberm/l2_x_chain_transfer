@@ -3,6 +3,7 @@ package simulator
 type Config struct {
 	Runs         int            `json:"runs"`
 	Dst          string         `json:"dst"`
+	Submit       bool           `json:"submit"`
 	Logger       LoggerConfig   `json:"logger"`
 	Ethereum     EthereumConfig `json:"ethereum"`
 	BurnCircuit  CircuitConfig  `json:"burnCircuit"`

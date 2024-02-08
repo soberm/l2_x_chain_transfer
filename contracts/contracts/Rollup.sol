@@ -6,6 +6,15 @@ import "./ClaimVerifier.sol";
 
 contract Rollup {
 
+    struct Transfer {
+        uint256 nonce;
+        uint256 amount;
+        uint256[2] sender;
+        uint256[2] receiver;
+        uint256 fee;
+        uint256 dest;
+    }
+
     event BurnEvent(
         uint256 preStateRoot,
         uint256 postStateRoot,
@@ -26,7 +35,8 @@ contract Rollup {
     function Burn(
         uint256 postStateRoot,
         uint256 transactionsRoot,
-        uint256[4] memory compressedProof
+        uint256[4] memory compressedProof,
+        Transfer[2] calldata transfers
     ) public {
         uint[4] memory input = [stateRoot, postStateRoot, transactionsRoot, 1];
         burnVerifier.verifyCompressedProof(compressedProof, input);
@@ -37,7 +47,8 @@ contract Rollup {
     function Claim(
         uint256 postStateRoot,
         uint256 transactionsRoot,
-        uint256[4] memory compressedProof
+        uint256[4] memory compressedProof,
+        Transfer[2] calldata transfers
     ) public {
         uint[3] memory input = [stateRoot, postStateRoot, transactionsRoot];
         claimVerifier.verifyCompressedProof(compressedProof, input);
