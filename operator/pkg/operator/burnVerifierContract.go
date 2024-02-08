@@ -31,7 +31,7 @@ var (
 
 // BurnVerifierContractMetaData contains all meta data concerning the BurnVerifierContract contract.
 var BurnVerifierContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"ProofInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PublicInputNotInField\",\"type\":\"error\"},{\"stateMutability\":\"nonpayable\",\"type\":\"fallback\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"}],\"name\":\"compressProof\",\"outputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressed\",\"type\":\"uint256[4]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyCompressedProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"name\":\"ProofInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PublicInputNotInField\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"}],\"name\":\"compressProof\",\"outputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressed\",\"type\":\"uint256[4]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyCompressedProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // BurnVerifierContractABI is the input ABI used to generate the binding from.
@@ -267,25 +267,4 @@ func (_BurnVerifierContract *BurnVerifierContractSession) VerifyProof(proof [8]*
 // Solidity: function verifyProof(uint256[8] proof, uint256[4] input) view returns()
 func (_BurnVerifierContract *BurnVerifierContractCallerSession) VerifyProof(proof [8]*big.Int, input [4]*big.Int) error {
 	return _BurnVerifierContract.Contract.VerifyProof(&_BurnVerifierContract.CallOpts, proof, input)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() returns()
-func (_BurnVerifierContract *BurnVerifierContractTransactor) Fallback(opts *bind.TransactOpts, calldata []byte) (*types.Transaction, error) {
-	return _BurnVerifierContract.contract.RawTransact(opts, calldata)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() returns()
-func (_BurnVerifierContract *BurnVerifierContractSession) Fallback(calldata []byte) (*types.Transaction, error) {
-	return _BurnVerifierContract.Contract.Fallback(&_BurnVerifierContract.TransactOpts, calldata)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() returns()
-func (_BurnVerifierContract *BurnVerifierContractTransactorSession) Fallback(calldata []byte) (*types.Transaction, error) {
-	return _BurnVerifierContract.Contract.Fallback(&_BurnVerifierContract.TransactOpts, calldata)
 }

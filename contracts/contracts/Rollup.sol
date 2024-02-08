@@ -6,7 +6,13 @@ import "./ClaimVerifier.sol";
 
 contract Rollup {
 
-    uint256 private stateRoot;
+    event BurnEvent(
+        uint256 preStateRoot,
+        uint256 postStateRoot,
+        uint256 transactionsRoot,
+        uint256[4] compressedProof
+    );
+    uint256 public stateRoot;
 
     BurnVerifier private burnVerifier;
     ClaimVerifier private claimVerifier;
@@ -22,9 +28,21 @@ contract Rollup {
         uint256 transactionsRoot,
         uint256[4] memory compressedProof
     ) public {
+        uint[4] memory input = [stateRoot, postStateRoot, transactionsRoot, 1];
+        burnVerifier.verifyCompressedProof(compressedProof, input);
+
+        stateRoot = postStateRoot;
+    }
+
+    function Claim(
+        uint256 postStateRoot,
+        uint256 transactionsRoot,
+        uint256[4] memory compressedProof
+    ) public {
         uint[3] memory input = [stateRoot, postStateRoot, transactionsRoot];
         claimVerifier.verifyCompressedProof(compressedProof, input);
 
         stateRoot = postStateRoot;
     }
+
 }

@@ -31,7 +31,7 @@ var (
 
 // RollupContractMetaData contains all meta data concerning the RollupContract contract.
 var RollupContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_stateRoot\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_burnVerifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_claimVerifier\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"Burn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_stateRoot\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_burnVerifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_claimVerifier\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"preStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"BurnEvent\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"Burn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"Claim\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"stateRoot\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // RollupContractABI is the input ABI used to generate the binding from.
@@ -180,6 +180,37 @@ func (_RollupContract *RollupContractTransactorRaw) Transact(opts *bind.Transact
 	return _RollupContract.Contract.contract.Transact(opts, method, params...)
 }
 
+// StateRoot is a free data retrieval call binding the contract method 0x9588eca2.
+//
+// Solidity: function stateRoot() view returns(uint256)
+func (_RollupContract *RollupContractCaller) StateRoot(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _RollupContract.contract.Call(opts, &out, "stateRoot")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// StateRoot is a free data retrieval call binding the contract method 0x9588eca2.
+//
+// Solidity: function stateRoot() view returns(uint256)
+func (_RollupContract *RollupContractSession) StateRoot() (*big.Int, error) {
+	return _RollupContract.Contract.StateRoot(&_RollupContract.CallOpts)
+}
+
+// StateRoot is a free data retrieval call binding the contract method 0x9588eca2.
+//
+// Solidity: function stateRoot() view returns(uint256)
+func (_RollupContract *RollupContractCallerSession) StateRoot() (*big.Int, error) {
+	return _RollupContract.Contract.StateRoot(&_RollupContract.CallOpts)
+}
+
 // Burn is a paid mutator transaction binding the contract method 0x150d98ea.
 //
 // Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof) returns()
@@ -199,4 +230,162 @@ func (_RollupContract *RollupContractSession) Burn(postStateRoot *big.Int, trans
 // Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof) returns()
 func (_RollupContract *RollupContractTransactorSession) Burn(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int) (*types.Transaction, error) {
 	return _RollupContract.Contract.Burn(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof)
+}
+
+// Claim is a paid mutator transaction binding the contract method 0x9a7602bd.
+//
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof) returns()
+func (_RollupContract *RollupContractTransactor) Claim(opts *bind.TransactOpts, postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int) (*types.Transaction, error) {
+	return _RollupContract.contract.Transact(opts, "Claim", postStateRoot, transactionsRoot, compressedProof)
+}
+
+// Claim is a paid mutator transaction binding the contract method 0x9a7602bd.
+//
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof) returns()
+func (_RollupContract *RollupContractSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int) (*types.Transaction, error) {
+	return _RollupContract.Contract.Claim(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof)
+}
+
+// Claim is a paid mutator transaction binding the contract method 0x9a7602bd.
+//
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof) returns()
+func (_RollupContract *RollupContractTransactorSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int) (*types.Transaction, error) {
+	return _RollupContract.Contract.Claim(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof)
+}
+
+// RollupContractBurnEventIterator is returned from FilterBurnEvent and is used to iterate over the raw logs and unpacked data for BurnEvent events raised by the RollupContract contract.
+type RollupContractBurnEventIterator struct {
+	Event *RollupContractBurnEvent // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *RollupContractBurnEventIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(RollupContractBurnEvent)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(RollupContractBurnEvent)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *RollupContractBurnEventIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *RollupContractBurnEventIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// RollupContractBurnEvent represents a BurnEvent event raised by the RollupContract contract.
+type RollupContractBurnEvent struct {
+	PreStateRoot     *big.Int
+	PostStateRoot    *big.Int
+	TransactionsRoot *big.Int
+	CompressedProof  [4]*big.Int
+	Raw              types.Log // Blockchain specific contextual infos
+}
+
+// FilterBurnEvent is a free log retrieval operation binding the contract event 0xa80ab886d69a255698da9bf9787ab6837dc01363efa653efbffbb9fa69058734.
+//
+// Solidity: event BurnEvent(uint256 preStateRoot, uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof)
+func (_RollupContract *RollupContractFilterer) FilterBurnEvent(opts *bind.FilterOpts) (*RollupContractBurnEventIterator, error) {
+
+	logs, sub, err := _RollupContract.contract.FilterLogs(opts, "BurnEvent")
+	if err != nil {
+		return nil, err
+	}
+	return &RollupContractBurnEventIterator{contract: _RollupContract.contract, event: "BurnEvent", logs: logs, sub: sub}, nil
+}
+
+// WatchBurnEvent is a free log subscription operation binding the contract event 0xa80ab886d69a255698da9bf9787ab6837dc01363efa653efbffbb9fa69058734.
+//
+// Solidity: event BurnEvent(uint256 preStateRoot, uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof)
+func (_RollupContract *RollupContractFilterer) WatchBurnEvent(opts *bind.WatchOpts, sink chan<- *RollupContractBurnEvent) (event.Subscription, error) {
+
+	logs, sub, err := _RollupContract.contract.WatchLogs(opts, "BurnEvent")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(RollupContractBurnEvent)
+				if err := _RollupContract.contract.UnpackLog(event, "BurnEvent", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseBurnEvent is a log parse operation binding the contract event 0xa80ab886d69a255698da9bf9787ab6837dc01363efa653efbffbb9fa69058734.
+//
+// Solidity: event BurnEvent(uint256 preStateRoot, uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof)
+func (_RollupContract *RollupContractFilterer) ParseBurnEvent(log types.Log) (*RollupContractBurnEvent, error) {
+	event := new(RollupContractBurnEvent)
+	if err := _RollupContract.contract.UnpackLog(event, "BurnEvent", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }

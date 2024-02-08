@@ -67,7 +67,6 @@ func (circuit *BurnCircuit) AllocateSlicesMerkleProofs() {
 
 	for i := 0; i < BatchSize; i++ {
 		circuit.MerkleProofSender[i].Path = make([]frontend.Variable, StateTreeDepth)
-		//circuit.MerkleProofTransfers[i].Path = make([]frontend.Variable, TransactionsTreeDepth)
 	}
 
 }

@@ -17,11 +17,8 @@ async function main() {
   console.log("BurnVerifier deployed to:", burnVerifierAddress);
   console.log("ClaimVerifier deployed to:", claimVerifierAddress);
 
-  const rollup = await Rollup.deploy(0, burnVerifierAddress, claimVerifierAddress);
+  const rollup = await Rollup.deploy("3065278908848025531261417432545150983396361703868879929916746847153394764839", burnVerifierAddress, claimVerifierAddress);
   await rollup.waitForDeployment();
-
-  const result = await burnVerifier.compressProof([0,0,0,0,0,0,0,0]);
-  console.log("Result:", result);
 
   console.log("Rollup deployed to:", await rollup.getAddress());
 }

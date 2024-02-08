@@ -5,13 +5,14 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/constraint/solver"
-	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"math/big"
 	"operator/pkg/operator"
@@ -24,6 +25,9 @@ import (
 type Simulator struct {
 	runs int
 	dst  string
+
+	burnSystem  constraint.ConstraintSystem
+	claimSystem constraint.ConstraintSystem
 }
 
 func NewSimulator(runs int, dst string) *Simulator {
@@ -36,33 +40,103 @@ func NewSimulator(runs int, dst string) *Simulator {
 func (s *Simulator) Run() error {
 	log.Info("starting simulator")
 
-	ethClient, err := ethclient.DialContext(context.Background(), "ws://127.0.0.1:8545")
+	ethClient, err := ethclient.DialContext(context.Background(), "http://127.0.0.1:7545")
 	if err != nil {
 		return fmt.Errorf("dial eth: %w", err)
 	}
 
-	verifierContract, err := operator.NewBurnVerifierContract(common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3"), ethClient)
+	burnVerifierContract, err := operator.NewBurnVerifierContract(common.HexToAddress("0x35060c2B7c608a6246ff45D78ceb27d6f67121e1"), ethClient)
 	if err != nil {
 		return fmt.Errorf("create verifier contract: %w", err)
 	}
 
-	var burnCircuit operator.BurnCircuit
-	burnCircuit.AllocateSlicesMerkleProofs()
-
-	var claimCircuit operator.ClaimCircuit
-	claimCircuit.AllocateSlicesMerkleProofs()
-
-	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &burnCircuit)
+	rollupContract, err := operator.NewRollupContract(common.HexToAddress("0xd4A55fD0f6DdfA53FF0b7B6B742f78c958546c0b"), ethClient)
 	if err != nil {
-		return fmt.Errorf("compile burn circuit: %w", err)
+		return fmt.Errorf("create verifier contract: %w", err)
 	}
-	log.Info("burn circuit compiled")
 
-	ccsClaim, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &claimCircuit)
+	file, err := os.OpenFile("./build/burn_circuit.r1cs", os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("compile claim circuit: %w", err)
+		return fmt.Errorf("open file: %w", err)
 	}
-	log.Info("claim circuit compiled")
+	defer file.Close()
+
+	ccs := groth16.NewCS(ecc.BN254)
+	_, err = ccs.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
+
+	var m1, m2 runtime.MemStats
+
+	file, err = os.OpenFile("./build/burn_proving_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+	pkBurn := groth16.NewProvingKey(ecc.BN254)
+	_, err = pkBurn.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
+	runtime.ReadMemStats(&m2)
+	pkMemoryBurn := m2.TotalAlloc - m1.TotalAlloc
+
+	file, err = os.OpenFile("./build/burn_verifying_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	vkBurn := groth16.NewVerifyingKey(ecc.BN254)
+	_, err = vkBurn.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
+
+	file, err = os.OpenFile("./build/claim_circuit.r1cs", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	ccsClaim := groth16.NewCS(ecc.BN254)
+	_, err = ccsClaim.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
+
+	file, err = os.OpenFile("./build/claim_proving_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+	pkClaim := groth16.NewProvingKey(ecc.BN254)
+	_, err = pkClaim.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
+	runtime.ReadMemStats(&m2)
+
+	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
+
+	file, err = os.OpenFile("./build/claim_verifying_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	vkClaim := groth16.NewVerifyingKey(ecc.BN254)
+	_, err = vkClaim.ReadFrom(file)
+	if err != nil {
+		return fmt.Errorf("read from file: %w", err)
+	}
 
 	headerRow := []string{
 		"run",
@@ -75,50 +149,6 @@ func (s *Simulator) Run() error {
 
 	data := [][]string{
 		headerRow,
-	}
-
-	var m1, m2 runtime.MemStats
-
-	runtime.GC()
-	runtime.ReadMemStats(&m1)
-	pk, vk, err := groth16.Setup(ccs)
-	if err != nil {
-		return fmt.Errorf("setup burn circuit: %w", err)
-	}
-	log.Info("burn circuit setup completed")
-	runtime.ReadMemStats(&m2)
-
-	pkMemoryBurn := m2.TotalAlloc - m1.TotalAlloc
-
-	solidityBurnVerifierFile, err := os.OpenFile("./BurnVerifier.sol", os.O_CREATE|os.O_RDWR, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer solidityBurnVerifierFile.Close()
-	err = vk.ExportSolidity(solidityBurnVerifierFile)
-	if err != nil {
-		return fmt.Errorf("export solidity verifier: %w", err)
-	}
-
-	runtime.GC()
-	runtime.ReadMemStats(&m1)
-	pkClaim, vkClaim, err := groth16.Setup(ccsClaim)
-	if err != nil {
-		return fmt.Errorf("setup claim circuit: %w", err)
-	}
-	log.Info("claim circuit setup completed")
-	runtime.ReadMemStats(&m2)
-
-	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
-
-	solidityClaimVerifierFile, err := os.OpenFile("./ClaimVerifier.sol", os.O_CREATE|os.O_RDWR, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("open file: %w", err)
-	}
-	defer solidityClaimVerifierFile.Close()
-	err = vkClaim.ExportSolidity(solidityClaimVerifierFile)
-	if err != nil {
-		return fmt.Errorf("export solidity verifier: %w", err)
 	}
 
 	rollup, err := NewRollup()
@@ -143,11 +173,26 @@ func (s *Simulator) Run() error {
 
 		publicWitness, _ := witness.Public()
 
+		witnessVector := publicWitness.Vector()
+
+		preStateRoot := big.NewInt(0)
+		witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
+
+		postStateRoot := big.NewInt(0)
+		witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
+
+		transactionsRoot := big.NewInt(0)
+		witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
+
+		log.Infof("PreState Root: %v", preStateRoot)
+		log.Infof("PostState Root: %v", postStateRoot)
+		log.Infof("Transactions Root: %v", transactionsRoot)
+
 		runtime.GC()
 		runtime.ReadMemStats(&m1)
 
 		start := time.Now()
-		proof, err := groth16.Prove(ccs, pk, witness)
+		proof, err := groth16.Prove(ccs, pkBurn, witness)
 		if err != nil {
 			return fmt.Errorf("failed to generate proof: %v", err)
 		}
@@ -159,7 +204,7 @@ func (s *Simulator) Run() error {
 		log.Infof("Burn Proving Time: %v", provingTime)
 		log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
 
-		err = groth16.Verify(proof, vk, publicWitness)
+		err = groth16.Verify(proof, vkBurn, publicWitness)
 		if err != nil {
 			return fmt.Errorf("failed to verify proof: %v", err)
 		}
@@ -170,16 +215,34 @@ func (s *Simulator) Run() error {
 		}
 		log.Infof("Ethereum Proof: %+v", ethereumProof)
 
-		compressedProof, err := verifierContract.CompressProof(&bind.CallOpts{
-			Pending: true,
-			From:    common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"),
-			Context: context.Background(),
-		}, [8]*big.Int{big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)})
+		compressedProof, err := burnVerifierContract.CompressProof(nil, ethereumProof)
+		log.Infof("Compressed Ethereum Proof: %+v", compressedProof)
+
+		ecdsaPrivateKey, err := crypto.HexToECDSA("40a22e3e69ce6e6ebd2267567699b3ea90d1553cda128c2b43af69ac83d9c0ed")
 		if err != nil {
-			return fmt.Errorf("compress proof: %w", err)
+			return fmt.Errorf("ecdsa private key: %w", err)
 		}
 
-		log.Infof("Compressed Ethereum Proof: %+v", compressedProof)
+		chainID, err := ethClient.ChainID(context.Background())
+		if err != nil {
+			return fmt.Errorf("chain id: %w", err)
+		}
+
+		auth, err := bind.NewKeyedTransactorWithChainID(ecdsaPrivateKey, chainID)
+		if err != nil {
+			return fmt.Errorf("new transactor: %w", err)
+		}
+		auth.GasPrice = big.NewInt(20000000000)
+
+		tx, err := rollupContract.Burn(auth, postStateRoot, transactionsRoot, compressedProof)
+		if err != nil {
+			return fmt.Errorf("submit proof: %w", err)
+		}
+
+		receipt, err := bind.WaitMined(context.Background(), ethClient, tx)
+		if err != nil || receipt.Status != 1 {
+			return err
+		}
 
 		witness, err = rollup.Claim(transfers)
 		if err != nil {
@@ -187,6 +250,12 @@ func (s *Simulator) Run() error {
 		}
 
 		publicWitness, _ = witness.Public()
+
+		witnessVector = publicWitness.Vector()
+
+		witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
+		witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
+		witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
 
 		runtime.GC()
 		runtime.ReadMemStats(&m1)
@@ -210,10 +279,29 @@ func (s *Simulator) Run() error {
 			return fmt.Errorf("failed to verify proof: %v", err)
 		}
 
+		ethereumProof, err = operator.ProofToEthereumProof(proof)
+		if err != nil {
+			return fmt.Errorf("convert proof to ethereum proof: %w", err)
+		}
+		log.Infof("Ethereum Proof: %+v", ethereumProof)
+
+		compressedProof, err = burnVerifierContract.CompressProof(nil, ethereumProof)
+		log.Infof("Compressed Ethereum Proof: %+v", compressedProof)
+
+		tx, err = rollupContract.Claim(auth, postStateRoot, transactionsRoot, compressedProof)
+		if err != nil {
+			return fmt.Errorf("submit proof: %w", err)
+		}
+
+		receipt, err = bind.WaitMined(context.Background(), ethClient, tx)
+		if err != nil || receipt.Status != 1 {
+			return err
+		}
+
 		data = append(data, measurement)
 	}
 
-	file, err := os.Create(s.dst)
+	file, err = os.Create(s.dst)
 	if err != nil {
 		return fmt.Errorf("create data file: %w", err)
 	}
