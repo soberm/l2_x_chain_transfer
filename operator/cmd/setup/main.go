@@ -52,10 +52,10 @@ func main() {
 
 func CompileSetupGenerateBurn(dst string) error {
 
-	var burCircuit operator.BurnCircuit
-	burCircuit.AllocateSlicesMerkleProofs()
+	var burnCircuit operator.BurnCircuit
+	burnCircuit.AllocateSlicesMerkleProofs()
 
-	constraintSystem, err := CompileCircuit(dst+"burn_circuit.r1cs", &burCircuit)
+	constraintSystem, err := CompileCircuit(dst+"burn_circuit.r1cs", &burnCircuit)
 	if err != nil {
 		log.Fatalf("compile burn circuit: %v", err)
 	}
