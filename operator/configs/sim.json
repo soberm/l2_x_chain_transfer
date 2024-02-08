@@ -1,0 +1,25 @@
+{
+  "runs": 1,
+  "dst": "data.csv",
+  "Logger": {
+    "LogLevel": "info",
+    "Format": "text"
+  },
+  "Ethereum": {
+    "host": "http://127.0.0.1:7545",
+    "privateKey": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "rollupContract": "0xd0692425257cDB0A16c83220355F973081a7E171",
+    "burnVerifierContract": "0xce0A7CD9ba702f8a3Be2ABE93f2a68D2C17Fc0C6",
+    "claimVerifierContract": "0x7F03b7dd883DE62b5c60B37b34Bf68ba020a55Bf"
+  },
+  "BurnCircuit": {
+    "constraintSystemPath": "./build/burn_circuit.r1cs",
+    "provingKeyPath": "./build/burn_proving_key",
+    "verifyingKeyPath": "./build/burn_verifying_key"
+  },
+  "ClaimCircuit": {
+    "constraintSystemPath": "./build/claim_circuit.r1cs",
+    "provingKeyPath": "./build/claim_proving_key",
+    "verifyingKeyPath": "./build/claim_verifying_key"
+  }
+}

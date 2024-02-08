@@ -23,39 +23,36 @@ import (
 )
 
 type Simulator struct {
-	runs int
-	dst  string
-
+	config      *Config
 	burnSystem  constraint.ConstraintSystem
 	claimSystem constraint.ConstraintSystem
 }
 
-func NewSimulator(runs int, dst string) *Simulator {
+func NewSimulator(config *Config) *Simulator {
 	return &Simulator{
-		runs: runs,
-		dst:  dst,
+		config: config,
 	}
 }
 
 func (s *Simulator) Run() error {
 	log.Info("starting simulator")
 
-	ethClient, err := ethclient.DialContext(context.Background(), "http://127.0.0.1:7545")
+	ethClient, err := ethclient.DialContext(context.Background(), s.config.Ethereum.Host)
 	if err != nil {
 		return fmt.Errorf("dial eth: %w", err)
 	}
 
-	burnVerifierContract, err := operator.NewBurnVerifierContract(common.HexToAddress("0x35060c2B7c608a6246ff45D78ceb27d6f67121e1"), ethClient)
+	burnVerifierContract, err := operator.NewBurnVerifierContract(common.HexToAddress(s.config.Ethereum.BurnVerifierContract), ethClient)
 	if err != nil {
 		return fmt.Errorf("create verifier contract: %w", err)
 	}
 
-	rollupContract, err := operator.NewRollupContract(common.HexToAddress("0xd4A55fD0f6DdfA53FF0b7B6B742f78c958546c0b"), ethClient)
+	rollupContract, err := operator.NewRollupContract(common.HexToAddress(s.config.Ethereum.RollupContract), ethClient)
 	if err != nil {
-		return fmt.Errorf("create verifier contract: %w", err)
+		return fmt.Errorf("create rollup contract: %w", err)
 	}
 
-	file, err := os.OpenFile("./build/burn_circuit.r1cs", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err := os.OpenFile(s.config.BurnCircuit.ConstraintSystemPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -69,7 +66,7 @@ func (s *Simulator) Run() error {
 
 	var m1, m2 runtime.MemStats
 
-	file, err = os.OpenFile("./build/burn_proving_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err = os.OpenFile(s.config.BurnCircuit.ProvingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -85,7 +82,7 @@ func (s *Simulator) Run() error {
 	runtime.ReadMemStats(&m2)
 	pkMemoryBurn := m2.TotalAlloc - m1.TotalAlloc
 
-	file, err = os.OpenFile("./build/burn_verifying_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err = os.OpenFile(s.config.BurnCircuit.VerifyingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -97,7 +94,7 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("read from file: %w", err)
 	}
 
-	file, err = os.OpenFile("./build/claim_circuit.r1cs", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err = os.OpenFile(s.config.ClaimCircuit.ConstraintSystemPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -109,7 +106,7 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("read from file: %w", err)
 	}
 
-	file, err = os.OpenFile("./build/claim_proving_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err = os.OpenFile(s.config.ClaimCircuit.ProvingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -126,7 +123,7 @@ func (s *Simulator) Run() error {
 
 	pkMemoryClaim := m2.TotalAlloc - m1.TotalAlloc
 
-	file, err = os.OpenFile("./build/claim_verifying_key", os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err = os.OpenFile(s.config.ClaimCircuit.VerifyingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
@@ -156,7 +153,7 @@ func (s *Simulator) Run() error {
 		return fmt.Errorf("create rollup: %w", err)
 	}
 
-	for i := 0; i < s.runs; i++ {
+	for i := 0; i < s.config.Runs; i++ {
 		measurement := make([]string, 0)
 		measurement = append(measurement, strconv.Itoa(i))
 		measurement = append(measurement, strconv.Itoa(operator.BatchSize))
@@ -184,10 +181,6 @@ func (s *Simulator) Run() error {
 		transactionsRoot := big.NewInt(0)
 		witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
 
-		log.Infof("PreState Root: %v", preStateRoot)
-		log.Infof("PostState Root: %v", postStateRoot)
-		log.Infof("Transactions Root: %v", transactionsRoot)
-
 		runtime.GC()
 		runtime.ReadMemStats(&m1)
 
@@ -213,10 +206,8 @@ func (s *Simulator) Run() error {
 		if err != nil {
 			return fmt.Errorf("convert proof to ethereum proof: %w", err)
 		}
-		log.Infof("Ethereum Proof: %+v", ethereumProof)
 
 		compressedProof, err := burnVerifierContract.CompressProof(nil, ethereumProof)
-		log.Infof("Compressed Ethereum Proof: %+v", compressedProof)
 
 		ecdsaPrivateKey, err := crypto.HexToECDSA("40a22e3e69ce6e6ebd2267567699b3ea90d1553cda128c2b43af69ac83d9c0ed")
 		if err != nil {
@@ -301,7 +292,7 @@ func (s *Simulator) Run() error {
 		data = append(data, measurement)
 	}
 
-	file, err = os.Create(s.dst)
+	file, err = os.Create(s.config.Dst)
 	if err != nil {
 		return fmt.Errorf("create data file: %w", err)
 	}
