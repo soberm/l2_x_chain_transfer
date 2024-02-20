@@ -26,7 +26,7 @@ func init() {
 }
 
 func main() {
-	b := flag.String("b", "./build/", "filename of the config file")
+	b := flag.String("b", "./build/", "build path")
 	flag.Parse()
 
 	log.Infof("running setup...")
