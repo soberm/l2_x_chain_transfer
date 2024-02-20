@@ -6,6 +6,8 @@ import "./ClaimVerifier.sol";
 
 contract Rollup {
 
+    uint256 public constant BATCH_SIZE = 4;
+
     struct Transfer {
         uint256 nonce;
         uint256 amount;
@@ -36,7 +38,7 @@ contract Rollup {
         uint256 postStateRoot,
         uint256 transactionsRoot,
         uint256[4] memory compressedProof,
-        Transfer[2] calldata transfers
+        Transfer[BATCH_SIZE] calldata transfers
     ) public {
         uint[4] memory input = [stateRoot, postStateRoot, transactionsRoot, 1];
         burnVerifier.verifyCompressedProof(compressedProof, input);
@@ -48,7 +50,7 @@ contract Rollup {
         uint256 postStateRoot,
         uint256 transactionsRoot,
         uint256[4] memory compressedProof,
-        Transfer[2] calldata transfers
+        Transfer[BATCH_SIZE] calldata transfers
     ) public {
         uint[3] memory input = [stateRoot, postStateRoot, transactionsRoot];
         claimVerifier.verifyCompressedProof(compressedProof, input);

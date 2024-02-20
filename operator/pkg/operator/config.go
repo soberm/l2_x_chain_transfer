@@ -1,14 +1,21 @@
 package operator
 
 type Config struct {
-	Logger   LoggerConfig   `json:"logger"`
-	Ethereum EthereumConfig `json:"ethereum"`
-	Circuit  CircuitConfig  `json:"circuit"`
+	Runs         int            `json:"runs"`
+	Dst          string         `json:"dst"`
+	Submit       bool           `json:"submit"`
+	Logger       LoggerConfig   `json:"logger"`
+	Ethereum     EthereumConfig `json:"ethereum"`
+	BurnCircuit  CircuitConfig  `json:"burnCircuit"`
+	ClaimCircuit CircuitConfig  `json:"claimCircuit"`
 }
 
 type EthereumConfig struct {
-	Host       string `json:"host"`
-	PrivateKey string `json:"privateKey"`
+	Host                  string `json:"host"`
+	PrivateKey            string `json:"privateKey"`
+	RollupContract        string `json:"rollupContract"`
+	BurnVerifierContract  string `json:"burnVerifierContract"`
+	ClaimVerifierContract string `json:"claimVerifierContract"`
 }
 
 type LoggerConfig struct {
@@ -20,5 +27,4 @@ type CircuitConfig struct {
 	ConstraintSystemPath string `json:"constraintSystemPath"`
 	ProvingKeyPath       string `json:"provingKeyPath"`
 	VerifyingKeyPath     string `json:"verifyingKeyPath"`
-	SolidityVerifierPath string `json:"solidityVerifierPath"`
 }

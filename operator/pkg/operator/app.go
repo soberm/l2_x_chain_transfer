@@ -3,17 +3,23 @@ package operator
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
+	"encoding/csv"
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/backend/witness"
 	"github.com/consensys/gnark/constraint"
-	"github.com/consensys/gnark/frontend"
-	"github.com/consensys/gnark/frontend/cs/r1cs"
+	"github.com/consensys/gnark/constraint/solver"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"math/big"
 	"os"
-	"path/filepath"
+	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -22,12 +28,28 @@ type App struct {
 	cancel context.CancelFunc
 	config *Config
 
-	ethClient  *ethclient.Client
-	privateKey *ecdsa.PrivateKey
+	chainID               *big.Int
+	ethClient             *ethclient.Client
+	privateKey            *ecdsa.PrivateKey
+	burnVerifierContract  *BurnVerifierContract
+	claimVerifierContract *ClaimVerifierContract
+	rollupContract        *RollupContract
 
-	ccs          constraint.ConstraintSystem
-	provingKey   groth16.ProvingKey
-	verifyingKey groth16.VerifyingKey
+	rollup *Rollup
+
+	burnSystem  constraint.ConstraintSystem
+	claimSystem constraint.ConstraintSystem
+
+	burnProvingKey  groth16.ProvingKey
+	claimProvingKey groth16.ProvingKey
+
+	burnVerifyingKey  groth16.VerifyingKey
+	claimVerifyingKey groth16.VerifyingKey
+
+	burnTotalAlloc  uint64
+	claimTotalAlloc uint64
+
+	measurement []string
 }
 
 func NewApp(config *Config) *App {
@@ -40,170 +62,314 @@ func NewApp(config *Config) *App {
 }
 
 func (a *App) Run() error {
-	log.Infof("running app...")
+	log.Info("running app...")
 
+	err := a.ConnectEthereum()
+	if err != nil {
+		return fmt.Errorf("connect ethereum: %w", err)
+	}
+
+	a.rollup, err = NewRollup()
+	if err != nil {
+		return fmt.Errorf("create rollup: %w", err)
+	}
+
+	err = a.LoadConstraintSystems()
+	if err != nil {
+		return fmt.Errorf("load constraint systems: %w", err)
+	}
+
+	headerRow := []string{
+		"run",
+		"batchSize",
+		"provingTimeBurn",
+		"memoryUsageBurn",
+		"provingTimeClaim",
+		"memoryUsageClaim",
+	}
+
+	data := [][]string{
+		headerRow,
+	}
+
+	for i := 0; i < a.config.Runs; i++ {
+		a.measurement = make([]string, 0)
+		a.measurement = append(a.measurement, strconv.Itoa(i))
+		a.measurement = append(a.measurement, strconv.Itoa(BatchSize))
+
+		transfers, err := a.rollup.GenerateTransfers(BatchSize)
+		if err != nil {
+			return fmt.Errorf("generate transactions: %w", err)
+		}
+
+		var rollupTransfers [BatchSize]RollupTransfer
+		for j, transfer := range transfers {
+			rollupTransfers[j] = transfer.RollupTransfer()
+		}
+
+		w, err := a.rollup.Burn(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ := w.Public()
+
+		var m1, m2 runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start := time.Now()
+		proof, err := groth16.Prove(a.burnSystem, a.burnProvingKey, w)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime := time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		a.measurement = append(a.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		//a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))))
+		log.Infof("Burn Proving Time: %v", provingTime)
+		//log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
+
+		err = groth16.Verify(proof, a.burnVerifyingKey, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		if a.config.Submit {
+			err = a.SubmitBurnUpdate(proof, w, rollupTransfers)
+			if err != nil {
+				return fmt.Errorf("submit burn update: %w", err)
+			}
+		}
+
+		w, err = a.rollup.Claim(transfers)
+		if err != nil {
+			return fmt.Errorf("update state: %w", err)
+		}
+
+		publicWitness, _ = w.Public()
+
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		start = time.Now()
+		proverOption := backend.WithSolverOptions(solver.WithHints(Div))
+		proof, err = groth16.Prove(a.claimSystem, a.claimProvingKey, w, proverOption)
+		if err != nil {
+			return fmt.Errorf("failed to generate proof: %v", err)
+		}
+		provingTime = time.Since(start)
+		runtime.ReadMemStats(&m2)
+
+		log.Infof("Claim Proving Time: %v", provingTime)
+		//log.Infof("Claim Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
+		a.measurement = append(a.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
+		//a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
+
+		err = groth16.Verify(proof, a.claimVerifyingKey, publicWitness)
+		if err != nil {
+			return fmt.Errorf("failed to verify proof: %v", err)
+		}
+
+		if a.config.Submit {
+			err = a.SubmitClaimUpdate(proof, w, rollupTransfers)
+			if err != nil {
+				return fmt.Errorf("submit claim update: %w", err)
+			}
+		}
+
+		data = append(data, a.measurement)
+	}
+
+	file, err := os.Create(a.config.Dst)
+	if err != nil {
+		return fmt.Errorf("create data file: %w", err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
+
+	err = csvWriter.WriteAll(data)
+	if err != nil {
+		return fmt.Errorf("write data to file: %w", err)
+	}
+	csvWriter.Flush()
+
+	log.Info("stop simulator")
+	return nil
+}
+
+func (a *App) ConnectEthereum() error {
 	var err error
 	a.ethClient, err = ethclient.DialContext(a.ctx, a.config.Ethereum.Host)
 	if err != nil {
 		return fmt.Errorf("dial eth: %w", err)
 	}
 
+	a.chainID, err = a.ethClient.ChainID(a.ctx)
+	if err != nil {
+		return fmt.Errorf("chain id: %w", err)
+	}
+
 	a.privateKey, err = crypto.HexToECDSA(a.config.Ethereum.PrivateKey)
 	if err != nil {
-		return fmt.Errorf("invalid private key: %v", err)
+		return fmt.Errorf("ecdsa private key: %w", err)
 	}
 
-	if err = a.CompileCircuit(); err != nil {
-		return fmt.Errorf("compile circuit: %w", err)
+	a.burnVerifierContract, err = NewBurnVerifierContract(common.HexToAddress(a.config.Ethereum.BurnVerifierContract), a.ethClient)
+	if err != nil {
+		return fmt.Errorf("create verifier contract: %w", err)
 	}
 
-	if err = a.Setup(); err != nil {
-		return fmt.Errorf("setup: %w", err)
+	a.rollupContract, err = NewRollupContract(common.HexToAddress(a.config.Ethereum.RollupContract), a.ethClient)
+	if err != nil {
+		return fmt.Errorf("create rollup contract: %w", err)
 	}
-
-	go func() {
-		for {
-			select {
-			case <-a.ctx.Done():
-				return
-			default:
-				time.Sleep(1 * time.Second)
-			}
-		}
-	}()
 
 	return nil
 }
 
-func (a *App) Stop() {
-	log.Infof("stopping app...")
-	a.cancel()
-}
-
-func (a *App) CompileCircuit() error {
-
-	exists := true
-	if _, err := os.Stat(a.config.Circuit.ConstraintSystemPath); errors.Is(err, os.ErrNotExist) {
-		dirPath := filepath.Dir(a.config.Circuit.ConstraintSystemPath)
-
-		err = os.MkdirAll(dirPath, 0755)
-		if err != nil {
-			return fmt.Errorf("mkdir: %w", err)
-		}
-
-		exists = false
+func (a *App) LoadConstraintSystems() error {
+	var err error
+	a.burnSystem, a.burnProvingKey, a.burnVerifyingKey, err = a.LoadConstraintSystem(
+		a.config.BurnCircuit.ConstraintSystemPath,
+		a.config.BurnCircuit.ProvingKeyPath,
+		a.config.BurnCircuit.VerifyingKeyPath,
+	)
+	if err != nil {
+		return fmt.Errorf("load burn constraint system: %w", err)
 	}
 
-	file, err := os.OpenFile(a.config.Circuit.ConstraintSystemPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	a.claimSystem, a.claimProvingKey, a.claimVerifyingKey, err = a.LoadConstraintSystem(
+		a.config.ClaimCircuit.ConstraintSystemPath,
+		a.config.ClaimCircuit.ProvingKeyPath,
+		a.config.ClaimCircuit.VerifyingKeyPath,
+	)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("load claim constraint system: %w", err)
+	}
+
+	return nil
+}
+
+func (a *App) LoadConstraintSystem(constraintSystemPath, provingKeyPath, verifyingKeyPath string) (constraint.ConstraintSystem, groth16.ProvingKey, groth16.VerifyingKey, error) {
+	file, err := os.OpenFile(constraintSystemPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("open file: %w", err)
 	}
 	defer file.Close()
 
-	if exists {
-		log.Info("constraint system found, loading...")
-		a.ccs = groth16.NewCS(ecc.BN254)
-		_, err := a.ccs.ReadFrom(file)
-		if err != nil {
-			return fmt.Errorf("read from file: %w", err)
-		}
-		log.Info("constraint system loaded")
-		return nil
-	}
-	log.Info("constraint system not found, compiling circuit...")
-
-	var circuit BurnCircuit
-	circuit.AllocateSlicesMerkleProofs()
-
-	a.ccs, err = frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
+	system := groth16.NewCS(ecc.BN254)
+	_, err = system.ReadFrom(file)
 	if err != nil {
-		return fmt.Errorf("compile circuit: %w", err)
+		return nil, nil, nil, fmt.Errorf("read from file: %w", err)
 	}
-	log.Info("circuit compiled")
 
-	_, err = a.ccs.WriteTo(file)
+	file, err = os.OpenFile(provingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("write to file: %w", err)
+		return nil, nil, nil, fmt.Errorf("open file: %w", err)
 	}
-	log.Info("circuit saved")
+	defer file.Close()
+
+	pk := groth16.NewProvingKey(ecc.BN254)
+	_, err = pk.ReadFrom(file)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read from file: %w", err)
+	}
+
+	file, err = os.OpenFile(verifyingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("open file: %w", err)
+	}
+	defer file.Close()
+
+	vk := groth16.NewVerifyingKey(ecc.BN254)
+	_, err = vk.ReadFrom(file)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("read from file: %w", err)
+	}
+
+	return system, pk, vk, nil
+}
+
+func (a *App) ExtractPublicInputs(witness witness.Witness) (*big.Int, *big.Int, *big.Int) {
+
+	witnessVector := witness.Vector()
+
+	preStateRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[0].BigInt(preStateRoot)
+
+	postStateRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[1].BigInt(postStateRoot)
+
+	transactionsRoot := big.NewInt(0)
+	witnessVector.(fr.Vector)[2].BigInt(transactionsRoot)
+
+	return preStateRoot, postStateRoot, transactionsRoot
+}
+
+func (a *App) SubmitBurnUpdate(proof groth16.Proof, w witness.Witness, transfers [BatchSize]RollupTransfer) error {
+	ethereumProof, err := ProofToEthereumProof(proof)
+	if err != nil {
+		return fmt.Errorf("convert proof to ethereum proof: %w", err)
+	}
+
+	compressedProof, err := a.burnVerifierContract.CompressProof(nil, ethereumProof)
+	if err != nil {
+		return fmt.Errorf("compress proof: %w", err)
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(a.privateKey, a.chainID)
+	if err != nil {
+		return fmt.Errorf("new transactor: %w", err)
+	}
+	auth.GasPrice = big.NewInt(20000000000)
+
+	_, postStateRoot, transactionsRoot := a.ExtractPublicInputs(w)
+
+	tx, err := a.rollupContract.Burn(auth, postStateRoot, transactionsRoot, compressedProof, transfers)
+	if err != nil {
+		return fmt.Errorf("submit burn update: %w", err)
+	}
+
+	_, err = bind.WaitMined(a.ctx, a.ethClient, tx)
+	if err != nil {
+		return fmt.Errorf("wait mined: %w", err)
+	}
 
 	return nil
 }
 
-func (a *App) Setup() error {
-
-	exists := true
-	if _, err := os.Stat(a.config.Circuit.ProvingKeyPath); errors.Is(err, os.ErrNotExist) {
-		dirPath := filepath.Dir(a.config.Circuit.ProvingKeyPath)
-
-		err = os.MkdirAll(dirPath, 0755)
-		if err != nil {
-			return fmt.Errorf("mkdir: %w", err)
-		}
-
-		exists = false
-	}
-
-	provingKeyFile, err := os.OpenFile(a.config.Circuit.ProvingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+func (a *App) SubmitClaimUpdate(proof groth16.Proof, w witness.Witness, transfers [BatchSize]RollupTransfer) error {
+	ethereumProof, err := ProofToEthereumProof(proof)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("convert proof to ethereum proof: %w", err)
 	}
-	defer provingKeyFile.Close()
 
-	verifyingKeyFile, err := os.OpenFile(a.config.Circuit.VerifyingKeyPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	compressedProof, err := a.burnVerifierContract.CompressProof(nil, ethereumProof)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("compress proof: %w", err)
 	}
-	defer verifyingKeyFile.Close()
 
-	solidityVerifierFile, err := os.OpenFile(a.config.Circuit.SolidityVerifierPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	auth, err := bind.NewKeyedTransactorWithChainID(a.privateKey, a.chainID)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("new transactor: %w", err)
 	}
-	defer solidityVerifierFile.Close()
+	auth.GasPrice = big.NewInt(20000000000)
 
-	if exists {
-		log.Info("proving and verifying key found, loading...")
+	_, postStateRoot, transactionsRoot := a.ExtractPublicInputs(w)
 
-		a.provingKey = groth16.NewProvingKey(ecc.BN254)
-		_, err := a.provingKey.ReadFrom(provingKeyFile)
-		if err != nil {
-			return fmt.Errorf("read from file: %w", err)
-		}
-
-		a.verifyingKey = groth16.NewVerifyingKey(ecc.BN254)
-		_, err = a.verifyingKey.ReadFrom(verifyingKeyFile)
-		if err != nil {
-			return fmt.Errorf("read from file: %w", err)
-		}
-
-		log.Info("proving and verifying key loaded")
-		return nil
-	}
-	log.Info("proving and verifying key not found, executing setup...")
-
-	a.provingKey, a.verifyingKey, err = groth16.Setup(a.ccs)
+	tx, err := a.rollupContract.Claim(auth, postStateRoot, transactionsRoot, compressedProof, transfers)
 	if err != nil {
-		return fmt.Errorf("setup circuit: %w", err)
+		return fmt.Errorf("submit claim update: %w", err)
 	}
-	log.Info("circuit setup completed")
 
-	_, err = a.provingKey.WriteTo(provingKeyFile)
+	_, err = bind.WaitMined(a.ctx, a.ethClient, tx)
 	if err != nil {
-		return fmt.Errorf("write to file: %w", err)
+		return fmt.Errorf("wait mined: %w", err)
 	}
-	log.Info("proving key saved")
-
-	_, err = a.verifyingKey.WriteTo(verifyingKeyFile)
-	if err != nil {
-		return fmt.Errorf("write to file: %w", err)
-	}
-	log.Info("verifying key saved")
-
-	if err = a.verifyingKey.ExportSolidity(solidityVerifierFile); err != nil {
-		return fmt.Errorf("export solidity verifier: %w", err)
-	}
-	log.Info("solidity verifier saved")
 
 	return nil
 }

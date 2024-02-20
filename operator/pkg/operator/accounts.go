@@ -1,11 +1,10 @@
-package simulator
+package operator
 
 import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa"
 	"math/big"
 	"math/rand"
-	"operator/pkg/operator"
 )
 
 func generatePrivateKeys(number int) ([]*eddsa.PrivateKey, error) {
@@ -22,10 +21,10 @@ func generatePrivateKeys(number int) ([]*eddsa.PrivateKey, error) {
 	return privateKeys, nil
 }
 
-func createAccounts(privateKeys []*eddsa.PrivateKey) ([]*operator.Account, error) {
-	accounts := make([]*operator.Account, len(privateKeys))
+func createAccounts(privateKeys []*eddsa.PrivateKey) ([]*Account, error) {
+	accounts := make([]*Account, len(privateKeys))
 	for i, privateKey := range privateKeys {
-		accounts[i] = &operator.Account{
+		accounts[i] = &Account{
 			Index:     big.NewInt(int64(i)),
 			Nonce:     big.NewInt(0),
 			PublicKey: &privateKey.PublicKey,

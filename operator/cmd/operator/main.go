@@ -6,8 +6,6 @@ import (
 	"github.com/spf13/viper"
 	"operator/pkg/operator"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 var log = logrus.New()
@@ -68,9 +66,4 @@ func main() {
 		log.Fatalf("running app: %v", err)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-
-	app.Stop()
 }

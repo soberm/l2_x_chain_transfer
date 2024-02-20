@@ -1,4 +1,4 @@
-package simulator
+package operator
 
 import (
 	"bytes"
@@ -11,18 +11,17 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/accumulator/merkle"
 	"math/big"
-	"operator/pkg/operator"
 )
 
 type Rollup struct {
-	Accounts    []*operator.Account
+	Accounts    []*Account
 	PrivateKeys []*eddsa.PrivateKey
-	State       *operator.State
+	State       *State
 }
 
 func NewRollup() (*Rollup, error) {
 
-	privateKeys, err := generatePrivateKeys(operator.NumberAccounts)
+	privateKeys, err := generatePrivateKeys(NumberAccounts)
 	if err != nil {
 		return nil, fmt.Errorf("generate private keys: %w", err)
 	}
@@ -33,7 +32,7 @@ func NewRollup() (*Rollup, error) {
 		return nil, fmt.Errorf("create accounts: %w", err)
 	}
 
-	state, err := operator.NewState(mimc.NewMiMC(), accounts)
+	state, err := NewState(mimc.NewMiMC(), accounts)
 	if err != nil {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
@@ -41,9 +40,9 @@ func NewRollup() (*Rollup, error) {
 	return &Rollup{Accounts: accounts, PrivateKeys: privateKeys, State: state}, nil
 }
 
-func (r *Rollup) GenerateTransfers(number int) ([]operator.Transfer, error) {
+func (r *Rollup) GenerateTransfers(number int) ([]Transfer, error) {
 	hFunc := mimc.NewMiMC()
-	transfers := make([]operator.Transfer, number)
+	transfers := make([]Transfer, number)
 	transferData := make([]byte, hFunc.Size()*number)
 
 	for i := 0; i < number; i++ {
@@ -51,7 +50,7 @@ func (r *Rollup) GenerateTransfers(number int) ([]operator.Transfer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read account: %w", err)
 		}
-		transfer := operator.NewTransfer(10,
+		transfer := NewTransfer(10,
 			4,
 			r.PrivateKeys[sender.Index.Uint64()].PublicKey,
 			r.PrivateKeys[sender.Index.Uint64()].PublicKey,
@@ -71,16 +70,16 @@ func (r *Rollup) GenerateTransfers(number int) ([]operator.Transfer, error) {
 	return transfers, nil
 }
 
-func (r *Rollup) Burn(transfers []operator.Transfer) (witness.Witness, error) {
+func (r *Rollup) Burn(transfers []Transfer) (witness.Witness, error) {
 
 	preStateRoot, err := r.State.Root()
 	if err != nil {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	var senderConstraints [operator.BatchSize]operator.AccountConstraints
-	var senderMerkleProofs [operator.BatchSize]merkle.MerkleProof
-	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
+	var senderConstraints [BatchSize]AccountConstraints
+	var senderMerkleProofs [BatchSize]merkle.MerkleProof
+	var transfersConstraints [BatchSize]TransferConstraints
 
 	transfersRoot, err := r.TransfersRoot(transfers)
 	if err != nil {
@@ -118,14 +117,14 @@ func (r *Rollup) Burn(transfers []operator.Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	assignment := &operator.BurnCircuit{
+	assignment := &BurnCircuit{
 		Sender:            senderConstraints,
 		MerkleProofSender: senderMerkleProofs,
 		Transfers:         transfersConstraints,
 		PreStateRoot:      preStateRoot,
 		PostStateRoot:     postStateRoot,
 		TransactionsRoot:  transfersRoot,
-		Blockchains:       [operator.NumberBlockchains]frontend.Variable{1},
+		Blockchains:       [NumberBlockchains]frontend.Variable{1},
 	}
 
 	w, err := frontend.NewWitness(assignment, ecc.BN254.ScalarField())
@@ -136,15 +135,15 @@ func (r *Rollup) Burn(transfers []operator.Transfer) (witness.Witness, error) {
 	return w, nil
 }
 
-func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
+func (r *Rollup) Claim(transfers []Transfer) (witness.Witness, error) {
 	preStateRoot, err := r.State.Root()
 	if err != nil {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	var receiverConstraints [operator.BatchSize]operator.AccountConstraints
-	var receiverMerkleProofs [operator.BatchSize]merkle.MerkleProof
-	var transfersConstraints [operator.BatchSize]operator.TransferConstraints
+	var receiverConstraints [BatchSize]AccountConstraints
+	var receiverMerkleProofs [BatchSize]merkle.MerkleProof
+	var transfersConstraints [BatchSize]TransferConstraints
 
 	transfersRoot, err := r.TransfersRoot(transfers)
 	if err != nil {
@@ -183,7 +182,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		}
 	}
 
-	sourceOperator, err := r.State.ReadAccount(operator.NumberAccounts - 1)
+	sourceOperator, err := r.State.ReadAccount(NumberAccounts - 1)
 	if err != nil {
 		return nil, fmt.Errorf("read account: %w", err)
 	}
@@ -205,7 +204,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("failed to write account: %v", err)
 	}
 
-	targetOperator, err := r.State.ReadAccount(operator.NumberAccounts - 2)
+	targetOperator, err := r.State.ReadAccount(NumberAccounts - 2)
 	if err != nil {
 		return nil, fmt.Errorf("read account: %w", err)
 	}
@@ -232,7 +231,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	assignment := &operator.ClaimCircuit{
+	assignment := &ClaimCircuit{
 		Receiver:                  receiverConstraints,
 		SourceOperator:            sourceOperatorConstraints,
 		TargetOperator:            targetOperatorConstraints,
@@ -253,7 +252,7 @@ func (r *Rollup) Claim(transfers []operator.Transfer) (witness.Witness, error) {
 	return w, nil
 }
 
-func (r *Rollup) TransfersRoot(transfers []operator.Transfer) ([]byte, error) {
+func (r *Rollup) TransfersRoot(transfers []Transfer) ([]byte, error) {
 	hFunc := mimc.NewMiMC()
 	transferData := make([]byte, hFunc.Size()*len(transfers))
 
@@ -275,7 +274,7 @@ func (r *Rollup) TransfersRoot(transfers []operator.Transfer) ([]byte, error) {
 	return root, nil
 }
 
-func (r *Rollup) UpdateSender(account *operator.Account, transfer *operator.Transfer) error {
+func (r *Rollup) UpdateSender(account *Account, transfer *Transfer) error {
 	account.Nonce.Add(account.Nonce, big.NewInt(1))
 
 	amount := big.NewInt(0)
@@ -295,7 +294,7 @@ func (r *Rollup) UpdateSender(account *operator.Account, transfer *operator.Tran
 	return nil
 }
 
-func (r *Rollup) UpdateReceiver(account *operator.Account, transfer *operator.Transfer) error {
+func (r *Rollup) UpdateReceiver(account *Account, transfer *Transfer) error {
 	amount := big.NewInt(0)
 	transfer.Amount.BigInt(amount)
 
@@ -309,7 +308,7 @@ func (r *Rollup) UpdateReceiver(account *operator.Account, transfer *operator.Tr
 	return nil
 }
 
-func (r *Rollup) UpdateOperator(account *operator.Account, reward *big.Int) error {
+func (r *Rollup) UpdateOperator(account *Account, reward *big.Int) error {
 	account.Balance.Add(account.Balance, reward)
 
 	err := r.State.WriteAccount(*account)

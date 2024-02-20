@@ -29,6 +29,8 @@ func main() {
 	b := flag.String("b", "./build/", "filename of the config file")
 	flag.Parse()
 
+	log.Infof("running setup...")
+
 	if _, err := os.Stat(*b); errors.Is(err, os.ErrNotExist) {
 		dirPath := filepath.Dir(*b)
 

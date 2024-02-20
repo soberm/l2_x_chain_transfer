@@ -11,16 +11,6 @@ import (
 	"github.com/consensys/gnark/std/signature/eddsa"
 )
 
-const (
-	NumberAccounts = 4
-	StateTreeDepth = 3
-
-	BatchSize = 2
-
-	NumberBlockchains = 1
-	BlockchainID      = 0
-)
-
 type BurnCircuit struct {
 	Sender [BatchSize]AccountConstraints
 

@@ -41,7 +41,7 @@ type RollupTransfer struct {
 
 // RollupContractMetaData contains all meta data concerning the RollupContract contract.
 var RollupContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_stateRoot\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_burnVerifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_claimVerifier\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"preStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"BurnEvent\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256[2]\",\"name\":\"sender\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"receiver\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"dest\",\"type\":\"uint256\"}],\"internalType\":\"structRollup.Transfer[2]\",\"name\":\"transfers\",\"type\":\"tuple[2]\"}],\"name\":\"Burn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256[2]\",\"name\":\"sender\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"receiver\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"dest\",\"type\":\"uint256\"}],\"internalType\":\"structRollup.Transfer[2]\",\"name\":\"transfers\",\"type\":\"tuple[2]\"}],\"name\":\"Claim\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"stateRoot\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_stateRoot\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"_burnVerifier\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_claimVerifier\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"preStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"}],\"name\":\"BurnEvent\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"BATCH_SIZE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256[2]\",\"name\":\"sender\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"receiver\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"dest\",\"type\":\"uint256\"}],\"internalType\":\"structRollup.Transfer[4]\",\"name\":\"transfers\",\"type\":\"tuple[4]\"}],\"name\":\"Burn\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"postStateRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"transactionsRoot\",\"type\":\"uint256\"},{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"nonce\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"uint256[2]\",\"name\":\"sender\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"receiver\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"dest\",\"type\":\"uint256\"}],\"internalType\":\"structRollup.Transfer[4]\",\"name\":\"transfers\",\"type\":\"tuple[4]\"}],\"name\":\"Claim\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"stateRoot\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // RollupContractABI is the input ABI used to generate the binding from.
@@ -190,6 +190,37 @@ func (_RollupContract *RollupContractTransactorRaw) Transact(opts *bind.Transact
 	return _RollupContract.Contract.contract.Transact(opts, method, params...)
 }
 
+// BATCHSIZE is a free data retrieval call binding the contract method 0x49faa4d4.
+//
+// Solidity: function BATCH_SIZE() view returns(uint256)
+func (_RollupContract *RollupContractCaller) BATCHSIZE(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _RollupContract.contract.Call(opts, &out, "BATCH_SIZE")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
+}
+
+// BATCHSIZE is a free data retrieval call binding the contract method 0x49faa4d4.
+//
+// Solidity: function BATCH_SIZE() view returns(uint256)
+func (_RollupContract *RollupContractSession) BATCHSIZE() (*big.Int, error) {
+	return _RollupContract.Contract.BATCHSIZE(&_RollupContract.CallOpts)
+}
+
+// BATCHSIZE is a free data retrieval call binding the contract method 0x49faa4d4.
+//
+// Solidity: function BATCH_SIZE() view returns(uint256)
+func (_RollupContract *RollupContractCallerSession) BATCHSIZE() (*big.Int, error) {
+	return _RollupContract.Contract.BATCHSIZE(&_RollupContract.CallOpts)
+}
+
 // StateRoot is a free data retrieval call binding the contract method 0x9588eca2.
 //
 // Solidity: function stateRoot() view returns(uint256)
@@ -221,45 +252,45 @@ func (_RollupContract *RollupContractCallerSession) StateRoot() (*big.Int, error
 	return _RollupContract.Contract.StateRoot(&_RollupContract.CallOpts)
 }
 
-// Burn is a paid mutator transaction binding the contract method 0x9375ae83.
+// Burn is a paid mutator transaction binding the contract method 0x73692d7c.
 //
-// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractTransactor) Burn(opts *bind.TransactOpts, postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractTransactor) Burn(opts *bind.TransactOpts, postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.contract.Transact(opts, "Burn", postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
-// Burn is a paid mutator transaction binding the contract method 0x9375ae83.
+// Burn is a paid mutator transaction binding the contract method 0x73692d7c.
 //
-// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractSession) Burn(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractSession) Burn(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.Contract.Burn(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
-// Burn is a paid mutator transaction binding the contract method 0x9375ae83.
+// Burn is a paid mutator transaction binding the contract method 0x73692d7c.
 //
-// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractTransactorSession) Burn(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Burn(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractTransactorSession) Burn(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.Contract.Burn(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
-// Claim is a paid mutator transaction binding the contract method 0x18a766e5.
+// Claim is a paid mutator transaction binding the contract method 0x0134c032.
 //
-// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractTransactor) Claim(opts *bind.TransactOpts, postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractTransactor) Claim(opts *bind.TransactOpts, postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.contract.Transact(opts, "Claim", postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
-// Claim is a paid mutator transaction binding the contract method 0x18a766e5.
+// Claim is a paid mutator transaction binding the contract method 0x0134c032.
 //
-// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.Contract.Claim(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
-// Claim is a paid mutator transaction binding the contract method 0x18a766e5.
+// Claim is a paid mutator transaction binding the contract method 0x0134c032.
 //
-// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[2] transfers) returns()
-func (_RollupContract *RollupContractTransactorSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [2]RollupTransfer) (*types.Transaction, error) {
+// Solidity: function Claim(uint256 postStateRoot, uint256 transactionsRoot, uint256[4] compressedProof, (uint256,uint256,uint256[2],uint256[2],uint256,uint256)[4] transfers) returns()
+func (_RollupContract *RollupContractTransactorSession) Claim(postStateRoot *big.Int, transactionsRoot *big.Int, compressedProof [4]*big.Int, transfers [4]RollupTransfer) (*types.Transaction, error) {
 	return _RollupContract.Contract.Claim(&_RollupContract.TransactOpts, postStateRoot, transactionsRoot, compressedProof, transfers)
 }
 
