@@ -26,7 +26,7 @@ func NewRollup() (*Rollup, error) {
 		return nil, fmt.Errorf("generate private keys: %w", err)
 	}
 
-	log.Infof("Create accounts")
+	log.Infof("create accounts...")
 	accounts, err := createAccounts(privateKeys)
 	if err != nil {
 		return nil, fmt.Errorf("create accounts: %w", err)

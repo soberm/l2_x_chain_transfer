@@ -49,7 +49,9 @@ type App struct {
 	burnTotalAlloc  uint64
 	claimTotalAlloc uint64
 
-	measurement []string
+	measurement            []string
+	burnSystemMemoryUsage  uint64
+	claimSystemMemoryUsage uint64
 }
 
 func NewApp(config *Config) *App {
@@ -128,9 +130,9 @@ func (a *App) Run() error {
 		runtime.ReadMemStats(&m2)
 
 		a.measurement = append(a.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
-		//a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))))
-		log.Infof("Burn Proving Time: %v", provingTime)
-		//log.Infof("Burn Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryBurn))
+		a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+a.burnSystemMemoryUsage))))
+		log.Infof("burn proving time: %v", provingTime)
+		log.Infof("burn memory usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+a.burnSystemMemoryUsage))
 
 		err = groth16.Verify(proof, a.burnVerifyingKey, publicWitness)
 		if err != nil {
@@ -163,10 +165,10 @@ func (a *App) Run() error {
 		provingTime = time.Since(start)
 		runtime.ReadMemStats(&m2)
 
-		log.Infof("Claim Proving Time: %v", provingTime)
-		//log.Infof("Claim Memory Usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))
+		log.Infof("claim proving time: %v", provingTime)
+		log.Infof("claim memory usage: %v MB", bToMb(m2.TotalAlloc-m1.TotalAlloc+a.claimSystemMemoryUsage))
 		a.measurement = append(a.measurement, strconv.Itoa(int(provingTime.Milliseconds())))
-		//a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+pkMemoryClaim))))
+		a.measurement = append(a.measurement, strconv.Itoa(int(bToMb(m2.TotalAlloc-m1.TotalAlloc+a.claimSystemMemoryUsage))))
 
 		err = groth16.Verify(proof, a.claimVerifyingKey, publicWitness)
 		if err != nil {
@@ -197,7 +199,7 @@ func (a *App) Run() error {
 	}
 	csvWriter.Flush()
 
-	log.Info("stop simulator")
+	log.Info("stopping app...")
 	return nil
 }
 
@@ -233,6 +235,11 @@ func (a *App) ConnectEthereum() error {
 
 func (a *App) LoadConstraintSystems() error {
 	var err error
+
+	var m1, m2 runtime.MemStats
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
 	a.burnSystem, a.burnProvingKey, a.burnVerifyingKey, err = a.LoadConstraintSystem(
 		a.config.BurnCircuit.ConstraintSystemPath,
 		a.config.BurnCircuit.ProvingKeyPath,
@@ -241,7 +248,10 @@ func (a *App) LoadConstraintSystems() error {
 	if err != nil {
 		return fmt.Errorf("load burn constraint system: %w", err)
 	}
+	runtime.ReadMemStats(&m2)
+	a.burnSystemMemoryUsage = m2.TotalAlloc - m1.TotalAlloc
 
+	runtime.ReadMemStats(&m1)
 	a.claimSystem, a.claimProvingKey, a.claimVerifyingKey, err = a.LoadConstraintSystem(
 		a.config.ClaimCircuit.ConstraintSystemPath,
 		a.config.ClaimCircuit.ProvingKeyPath,
@@ -250,6 +260,8 @@ func (a *App) LoadConstraintSystems() error {
 	if err != nil {
 		return fmt.Errorf("load claim constraint system: %w", err)
 	}
+	runtime.ReadMemStats(&m2)
+	a.claimSystemMemoryUsage = m2.TotalAlloc - m1.TotalAlloc
 
 	return nil
 }
