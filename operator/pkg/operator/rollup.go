@@ -99,10 +99,7 @@ func (r *Rollup) Burn(transfers []Transfer) (witness.Witness, error) {
 			return nil, fmt.Errorf("create state: %w", err)
 		}
 
-		senderMerkleProofs[i] = merkle.MerkleProof{
-			RootHash: root,
-			Path:     senderMerkleProof,
-		}
+		senderMerkleProofs[i] = MerkleProofToConstraints(root, senderMerkleProof)
 
 		transfersConstraints[i] = transfers[i].Constraints()
 
@@ -171,10 +168,7 @@ func (r *Rollup) Claim(transfers []Transfer) (witness.Witness, error) {
 			return nil, fmt.Errorf("create state: %w", err)
 		}
 
-		receiverMerkleProofs[i] = merkle.MerkleProof{
-			RootHash: root,
-			Path:     receiverMerkleProof,
-		}
+		receiverMerkleProofs[i] = MerkleProofToConstraints(root, receiverMerkleProof)
 
 		err = r.UpdateReceiver(&receiver, &transfers[i])
 		if err != nil {
@@ -194,10 +188,7 @@ func (r *Rollup) Claim(transfers []Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	sourceOperatorMerkleProofConstraints := merkle.MerkleProof{
-		RootHash: root,
-		Path:     sourceOperatorMerkleProof,
-	}
+	sourceOperatorMerkleProofConstraints := MerkleProofToConstraints(root, sourceOperatorMerkleProof)
 
 	err = r.UpdateOperator(&sourceOperator, operatorReward)
 	if err != nil {
@@ -216,10 +207,7 @@ func (r *Rollup) Claim(transfers []Transfer) (witness.Witness, error) {
 		return nil, fmt.Errorf("create state: %w", err)
 	}
 
-	targetOperatorMerkleProofConstraints := merkle.MerkleProof{
-		RootHash: root,
-		Path:     targetOperatorMerkleProof,
-	}
+	targetOperatorMerkleProofConstraints := MerkleProofToConstraints(root, targetOperatorMerkleProof)
 
 	err = r.UpdateOperator(&targetOperator, operatorReward)
 	if err != nil {

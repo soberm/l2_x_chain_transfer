@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/consensys/gnark-crypto/accumulator/merkletree"
-	"github.com/consensys/gnark/frontend"
 	"hash"
 	"sync"
 )
@@ -85,26 +84,20 @@ func (s *State) Root() ([]byte, error) {
 	return merkletree.ReaderRoot(&buf, s.hFunc, s.hFunc.Size())
 }
 
-func (s *State) MerkleProof(i uint64) ([]byte, []frontend.Variable, error) {
+func (s *State) MerkleProof(i uint64) ([]byte, [][]byte, error) {
 	s.RLock()
 	defer s.RUnlock()
-
-	var path []frontend.Variable
 
 	var stateBuf bytes.Buffer
 	_, err := stateBuf.Write(s.hData)
 	if err != nil {
-		return nil, path, fmt.Errorf("%v", err)
+		return nil, nil, fmt.Errorf("%v", err)
 	}
 	root, proof, numLeaves, _ := merkletree.BuildReaderProof(&stateBuf, s.hFunc, s.hFunc.Size(), i)
 
 	if !merkletree.VerifyProof(s.hFunc, root, proof, i, numLeaves) {
-		return nil, path, errors.New("invalid merkle proof")
+		return nil, proof, errors.New("invalid merkle proof")
 	}
 
-	for i := 0; i < len(proof); i++ {
-		path = append(path, proof[i])
-	}
-
-	return root, path, nil
+	return root, proof, nil
 }
