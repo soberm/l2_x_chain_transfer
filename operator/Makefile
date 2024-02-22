@@ -9,6 +9,8 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GORUN=$(GOCMD) run
 
+BATCH_SIZE=8
+
 .PHONY: all
 all: test build
 
@@ -17,10 +19,13 @@ test:
 	$(GOTEST) -v ./...
 
 .PHONY: build
-build: $(PROGRAMS)
+build: operator setup
 
-$(PROGRAMS):
-	$(GOBUILD) -o $(GOBIN)/$@ -v ./cmd/$@
+operator:
+	$(GOBUILD) -o $(GOBIN)/operator -v ./cmd/operator
+
+setup:
+	$(GOBUILD) -o $(GOBIN)/setup -v ./cmd/setup
 
 .PHONY: clean
 clean:
