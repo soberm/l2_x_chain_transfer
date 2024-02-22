@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
+	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/backend/witness"
@@ -16,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"hash"
 	"math/big"
 	"os"
 	"runtime"
@@ -35,7 +38,12 @@ type App struct {
 	claimVerifierContract *ClaimVerifierContract
 	rollupContract        *RollupContract
 
+	hFunc hash.Hash
+
 	rollup *Rollup
+
+	accounts    []*Account
+	privateKeys []*eddsa.PrivateKey
 
 	burnSystem  constraint.ConstraintSystem
 	claimSystem constraint.ConstraintSystem
@@ -60,6 +68,7 @@ func NewApp(config *Config) *App {
 		ctx:    ctx,
 		cancel: cancel,
 		config: config,
+		hFunc:  mimc.NewMiMC(),
 	}
 }
 
@@ -71,7 +80,23 @@ func (a *App) Run() error {
 		return fmt.Errorf("connect ethereum: %w", err)
 	}
 
-	a.rollup, err = NewRollup()
+	a.privateKeys, err = generatePrivateKeys(NumberAccounts)
+	if err != nil {
+		return fmt.Errorf("generate private keys: %w", err)
+	}
+
+	log.Infof("creating %v test accounts...", NumberAccounts)
+	a.accounts, err = createAccounts(a.privateKeys)
+	if err != nil {
+		return fmt.Errorf("create accounts: %w", err)
+	}
+
+	state, err := NewState(a.hFunc, a.accounts)
+	if err != nil {
+		return fmt.Errorf("new state: %w", err)
+	}
+
+	a.rollup, err = NewRollup(state)
 	if err != nil {
 		return fmt.Errorf("create rollup: %w", err)
 	}
@@ -99,7 +124,7 @@ func (a *App) Run() error {
 		a.measurement = append(a.measurement, strconv.Itoa(i))
 		a.measurement = append(a.measurement, strconv.Itoa(BatchSize))
 
-		transfers, err := a.rollup.GenerateTransfers(BatchSize)
+		transfers, err := a.GenerateTestTransfers(BatchSize)
 		if err != nil {
 			return fmt.Errorf("generate transactions: %w", err)
 		}
@@ -265,6 +290,8 @@ func (a *App) LoadConstraintSystems() error {
 }
 
 func (a *App) LoadConstraintSystem(constraintSystemPath, provingKeyPath, verifyingKeyPath string) (constraint.ConstraintSystem, groth16.ProvingKey, groth16.VerifyingKey, error) {
+	log.Infof("loading constraint system from %v...", constraintSystemPath)
+
 	file, err := os.OpenFile(constraintSystemPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("open file: %w", err)
@@ -302,6 +329,36 @@ func (a *App) LoadConstraintSystem(constraintSystemPath, provingKeyPath, verifyi
 	}
 
 	return system, pk, vk, nil
+}
+
+func (a *App) GenerateTestTransfers(number int) ([]Transfer, error) {
+	hFunc := mimc.NewMiMC()
+	transfers := make([]Transfer, number)
+	transferData := make([]byte, hFunc.Size()*number)
+
+	for i := 0; i < number; i++ {
+		sender, err := a.rollup.State.ReadAccount(uint64(i))
+		if err != nil {
+			return nil, fmt.Errorf("read account: %w", err)
+		}
+		transfer := NewTransfer(10,
+			4,
+			a.privateKeys[sender.Index.Uint64()].PublicKey,
+			a.privateKeys[sender.Index.Uint64()].PublicKey,
+			sender.Nonce.Uint64(),
+			0,
+		)
+
+		_, msg, err := transfer.Sign(*a.privateKeys[sender.Index.Uint64()], mimc.NewMiMC())
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign transfer: %v", err)
+		}
+
+		transfers[i] = transfer
+		copy(transferData[i*hFunc.Size():(i+1)*hFunc.Size()], msg)
+	}
+
+	return transfers, nil
 }
 
 func (a *App) ExtractPublicInputs(witness witness.Witness) (*big.Int, *big.Int, *big.Int) {

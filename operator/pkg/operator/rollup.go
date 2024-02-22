@@ -6,7 +6,6 @@ import (
 	"github.com/consensys/gnark-crypto/accumulator/merkletree"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
-	"github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa"
 	"github.com/consensys/gnark/backend/witness"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/accumulator/merkle"
@@ -14,60 +13,11 @@ import (
 )
 
 type Rollup struct {
-	Accounts    []*Account
-	PrivateKeys []*eddsa.PrivateKey
-	State       *State
+	State *State
 }
 
-func NewRollup() (*Rollup, error) {
-
-	privateKeys, err := generatePrivateKeys(NumberAccounts)
-	if err != nil {
-		return nil, fmt.Errorf("generate private keys: %w", err)
-	}
-
-	log.Infof("create accounts...")
-	accounts, err := createAccounts(privateKeys)
-	if err != nil {
-		return nil, fmt.Errorf("create accounts: %w", err)
-	}
-
-	state, err := NewState(mimc.NewMiMC(), accounts)
-	if err != nil {
-		return nil, fmt.Errorf("create state: %w", err)
-	}
-
-	return &Rollup{Accounts: accounts, PrivateKeys: privateKeys, State: state}, nil
-}
-
-func (r *Rollup) GenerateTransfers(number int) ([]Transfer, error) {
-	hFunc := mimc.NewMiMC()
-	transfers := make([]Transfer, number)
-	transferData := make([]byte, hFunc.Size()*number)
-
-	for i := 0; i < number; i++ {
-		sender, err := r.State.ReadAccount(uint64(i))
-		if err != nil {
-			return nil, fmt.Errorf("read account: %w", err)
-		}
-		transfer := NewTransfer(10,
-			4,
-			r.PrivateKeys[sender.Index.Uint64()].PublicKey,
-			r.PrivateKeys[sender.Index.Uint64()].PublicKey,
-			sender.Nonce.Uint64(),
-			0,
-		)
-
-		_, msg, err := transfer.Sign(*r.PrivateKeys[sender.Index.Uint64()], mimc.NewMiMC())
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign transfer: %v", err)
-		}
-
-		transfers[i] = transfer
-		copy(transferData[i*hFunc.Size():(i+1)*hFunc.Size()], msg)
-	}
-
-	return transfers, nil
+func NewRollup(state *State) (*Rollup, error) {
+	return &Rollup{State: state}, nil
 }
 
 func (r *Rollup) Burn(transfers []Transfer) (witness.Witness, error) {
