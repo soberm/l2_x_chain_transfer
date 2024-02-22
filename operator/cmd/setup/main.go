@@ -106,7 +106,7 @@ func CompileCircuit(dst string, circuit frontend.Circuit) (constraint.Constraint
 	}
 	log.Info("circuit compiled")
 
-	file, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("open file: %w", err)
 	}
@@ -129,13 +129,13 @@ func Setup(pkDst string, vkDst string, system constraint.ConstraintSystem) (grot
 	}
 	log.Info("circuit setup completed")
 
-	pkFile, err := os.OpenFile(pkDst, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	pkFile, err := os.OpenFile(pkDst, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open file: %w", err)
 	}
 	defer pkFile.Close()
 
-	vkFile, err := os.OpenFile(vkDst, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	vkFile, err := os.OpenFile(vkDst, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open file: %w", err)
 	}
@@ -158,7 +158,7 @@ func Setup(pkDst string, vkDst string, system constraint.ConstraintSystem) (grot
 
 func GenerateSolidityVerifier(dst string, vk groth16.VerifyingKey) error {
 
-	file, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	file, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
