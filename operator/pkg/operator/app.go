@@ -109,17 +109,16 @@ func (a *App) Run() error {
 			rollupTransfers[j] = transfer.RollupTransfer()
 		}
 
+		var m1, m2 runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
 		w, err := a.rollup.Burn(transfers)
 		if err != nil {
 			return fmt.Errorf("update state: %w", err)
 		}
 
 		publicWitness, _ := w.Public()
-
-		var m1, m2 runtime.MemStats
-
-		runtime.GC()
-		runtime.ReadMemStats(&m1)
 
 		start := time.Now()
 		proof, err := groth16.Prove(a.burnSystem, a.burnProvingKey, w)
@@ -146,15 +145,14 @@ func (a *App) Run() error {
 			}
 		}
 
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
 		w, err = a.rollup.Claim(transfers)
 		if err != nil {
 			return fmt.Errorf("update state: %w", err)
 		}
 
 		publicWitness, _ = w.Public()
-
-		runtime.GC()
-		runtime.ReadMemStats(&m1)
 
 		start = time.Now()
 		proverOption := backend.WithSolverOptions(solver.WithHints(Div))
