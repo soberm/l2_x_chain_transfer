@@ -31,12 +31,14 @@ type App struct {
 	cancel context.CancelFunc
 	config *Config
 
-	chainID               *big.Int
-	ethClient             *ethclient.Client
-	privateKey            *ecdsa.PrivateKey
+	chainID    *big.Int
+	ethClient  *ethclient.Client
+	privateKey *ecdsa.PrivateKey
+
+	rollupContract        *RollupContract
+	oracleMockContract    *OracleMockContract
 	burnVerifierContract  *BurnVerifierContract
 	claimVerifierContract *ClaimVerifierContract
-	rollupContract        *RollupContract
 
 	hFunc hash.Hash
 
@@ -168,6 +170,8 @@ func (a *App) Run() error {
 			if err != nil {
 				return fmt.Errorf("submit burn update: %w", err)
 			}
+			_, _, transactionsRoot := a.ExtractPublicInputs(w)
+			err = a.SubmitCrossChainData(transactionsRoot, big.NewInt(NumberAccounts-1))
 		}
 
 		runtime.GC()
@@ -246,6 +250,11 @@ func (a *App) ConnectEthereum() error {
 	a.burnVerifierContract, err = NewBurnVerifierContract(common.HexToAddress(a.config.Ethereum.BurnVerifierContract), a.ethClient)
 	if err != nil {
 		return fmt.Errorf("create verifier contract: %w", err)
+	}
+
+	a.oracleMockContract, err = NewOracleMockContract(common.HexToAddress(a.config.Ethereum.OracleMockContract), a.ethClient)
+	if err != nil {
+		return fmt.Errorf("create oracle contract: %w", err)
 	}
 
 	a.rollupContract, err = NewRollupContract(common.HexToAddress(a.config.Ethereum.RollupContract), a.ethClient)
@@ -378,6 +387,8 @@ func (a *App) ExtractPublicInputs(witness witness.Witness) (*big.Int, *big.Int, 
 }
 
 func (a *App) SubmitBurnUpdate(proof groth16.Proof, w witness.Witness, transfers [BatchSize]RollupTransfer) error {
+	log.Infof("submitting burn update...")
+
 	ethereumProof, err := ProofToEthereumProof(proof)
 	if err != nil {
 		return fmt.Errorf("convert proof to ethereum proof: %w", err)
@@ -409,7 +420,31 @@ func (a *App) SubmitBurnUpdate(proof groth16.Proof, w witness.Witness, transfers
 	return nil
 }
 
+func (a *App) SubmitCrossChainData(transactionsRoot *big.Int, operator *big.Int) error {
+	log.Infof("submitting cross chain data...")
+
+	auth, err := bind.NewKeyedTransactorWithChainID(a.privateKey, a.chainID)
+	if err != nil {
+		return fmt.Errorf("new transactor: %w", err)
+	}
+	auth.GasPrice = big.NewInt(20000000000)
+
+	tx, err := a.oracleMockContract.SubmitTransactionsRoot(auth, transactionsRoot, operator)
+	if err != nil {
+		return fmt.Errorf("submit transactions root: %w", err)
+	}
+
+	_, err = bind.WaitMined(a.ctx, a.ethClient, tx)
+	if err != nil {
+		return fmt.Errorf("wait mined: %w", err)
+	}
+
+	return nil
+}
+
 func (a *App) SubmitClaimUpdate(proof groth16.Proof, w witness.Witness, transfers [BatchSize]RollupTransfer) error {
+	log.Infof("submitting claim update...")
+
 	ethereumProof, err := ProofToEthereumProof(proof)
 	if err != nil {
 		return fmt.Errorf("convert proof to ethereum proof: %w", err)
@@ -428,7 +463,7 @@ func (a *App) SubmitClaimUpdate(proof groth16.Proof, w witness.Witness, transfer
 
 	_, postStateRoot, transactionsRoot := a.ExtractPublicInputs(w)
 
-	tx, err := a.rollupContract.Claim(auth, postStateRoot, transactionsRoot, compressedProof, transfers)
+	tx, err := a.rollupContract.Claim(auth, postStateRoot, transactionsRoot, big.NewInt(NumberAccounts-1), compressedProof, transfers)
 	if err != nil {
 		return fmt.Errorf("submit claim update: %w", err)
 	}

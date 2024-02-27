@@ -19,9 +19,10 @@ type ClaimCircuit struct {
 
 	Transfers [BatchSize]TransferConstraints
 
-	PreStateRoot     frontend.Variable `gnark:",public"`
-	PostStateRoot    frontend.Variable `gnark:",public"`
-	TransactionsRoot frontend.Variable `gnark:",public"`
+	PreStateRoot        frontend.Variable `gnark:",public"`
+	PostStateRoot       frontend.Variable `gnark:",public"`
+	TransactionsRoot    frontend.Variable `gnark:",public"`
+	SourceOperatorIndex frontend.Variable `gnark:",public"`
 }
 
 func (circuit *ClaimCircuit) AllocateSlicesMerkleProofs() {
@@ -59,6 +60,7 @@ func (circuit *ClaimCircuit) Define(api frontend.API) error {
 		operatorReward = api.Add(operatorReward, result[0])
 	}
 
+	api.AssertIsEqual(circuit.SourceOperatorIndex, circuit.SourceOperator.Index)
 	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, operatorReward, &circuit.SourceOperator, &circuit.MerkleProofSourceOperator)
 
 	intermediateRoot = circuit.rewardOperator(api, &hFunc, intermediateRoot, operatorReward, &circuit.TargetOperator, &circuit.MerkleProofTargetOperator)

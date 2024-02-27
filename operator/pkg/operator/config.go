@@ -16,6 +16,7 @@ type EthereumConfig struct {
 	RollupContract        string `json:"rollupContract"`
 	BurnVerifierContract  string `json:"burnVerifierContract"`
 	ClaimVerifierContract string `json:"claimVerifierContract"`
+	OracleMockContract    string `json:"oracleMockContract"`
 }
 
 type LoggerConfig struct {

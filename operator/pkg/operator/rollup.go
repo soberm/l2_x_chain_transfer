@@ -180,6 +180,7 @@ func (r *Rollup) Claim(transfers []Transfer) (witness.Witness, error) {
 		PreStateRoot:              preStateRoot,
 		PostStateRoot:             postStateRoot,
 		TransactionsRoot:          transfersRoot,
+		SourceOperatorIndex:       NumberAccounts - 1,
 	}
 
 	w, err := frontend.NewWitness(assignment, ecc.BN254.ScalarField())
