@@ -23,7 +23,7 @@ You need to have the following software installed:
 3. Adapt the batch size and the number of accounts in const.go
 4. Build the constraint system setup: `go build -o constraint_system_setup`
 5. Run the constraint system setup: `./constraint_system_setup -b ./build`
-6. Update the verifier contracts in the contracts directory
+6. Generate the verifier contracts: `./scripts/generate_verifier.sh`
 
 ### Smart Contracts
 
