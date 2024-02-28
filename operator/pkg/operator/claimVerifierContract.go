@@ -31,7 +31,7 @@ var (
 
 // ClaimVerifierContractMetaData contains all meta data concerning the ClaimVerifierContract contract.
 var ClaimVerifierContractMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"ProofInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PublicInputNotInField\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"}],\"name\":\"compressProof\",\"outputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressed\",\"type\":\"uint256[4]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"internalType\":\"uint256[3]\",\"name\":\"input\",\"type\":\"uint256[3]\"}],\"name\":\"verifyCompressedProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"},{\"internalType\":\"uint256[3]\",\"name\":\"input\",\"type\":\"uint256[3]\"}],\"name\":\"verifyProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"name\":\"ProofInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PublicInputNotInField\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"}],\"name\":\"compressProof\",\"outputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressed\",\"type\":\"uint256[4]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[4]\",\"name\":\"compressedProof\",\"type\":\"uint256[4]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyCompressedProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256[8]\",\"name\":\"proof\",\"type\":\"uint256[8]\"},{\"internalType\":\"uint256[4]\",\"name\":\"input\",\"type\":\"uint256[4]\"}],\"name\":\"verifyProof\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // ClaimVerifierContractABI is the input ABI used to generate the binding from.
@@ -211,10 +211,10 @@ func (_ClaimVerifierContract *ClaimVerifierContractCallerSession) CompressProof(
 	return _ClaimVerifierContract.Contract.CompressProof(&_ClaimVerifierContract.CallOpts, proof)
 }
 
-// VerifyCompressedProof is a free data retrieval call binding the contract method 0x98c13db9.
+// VerifyCompressedProof is a free data retrieval call binding the contract method 0xf2457c8d.
 //
-// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyCompressedProof(opts *bind.CallOpts, compressedProof [4]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyCompressedProof(opts *bind.CallOpts, compressedProof [4]*big.Int, input [4]*big.Int) error {
 	var out []interface{}
 	err := _ClaimVerifierContract.contract.Call(opts, &out, "verifyCompressedProof", compressedProof, input)
 
@@ -226,24 +226,24 @@ func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyCompressedProof
 
 }
 
-// VerifyCompressedProof is a free data retrieval call binding the contract method 0x98c13db9.
+// VerifyCompressedProof is a free data retrieval call binding the contract method 0xf2457c8d.
 //
-// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractSession) VerifyCompressedProof(compressedProof [4]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractSession) VerifyCompressedProof(compressedProof [4]*big.Int, input [4]*big.Int) error {
 	return _ClaimVerifierContract.Contract.VerifyCompressedProof(&_ClaimVerifierContract.CallOpts, compressedProof, input)
 }
 
-// VerifyCompressedProof is a free data retrieval call binding the contract method 0x98c13db9.
+// VerifyCompressedProof is a free data retrieval call binding the contract method 0xf2457c8d.
 //
-// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractCallerSession) VerifyCompressedProof(compressedProof [4]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyCompressedProof(uint256[4] compressedProof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractCallerSession) VerifyCompressedProof(compressedProof [4]*big.Int, input [4]*big.Int) error {
 	return _ClaimVerifierContract.Contract.VerifyCompressedProof(&_ClaimVerifierContract.CallOpts, compressedProof, input)
 }
 
-// VerifyProof is a free data retrieval call binding the contract method 0x65c03259.
+// VerifyProof is a free data retrieval call binding the contract method 0x23572511.
 //
-// Solidity: function verifyProof(uint256[8] proof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyProof(opts *bind.CallOpts, proof [8]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyProof(uint256[8] proof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyProof(opts *bind.CallOpts, proof [8]*big.Int, input [4]*big.Int) error {
 	var out []interface{}
 	err := _ClaimVerifierContract.contract.Call(opts, &out, "verifyProof", proof, input)
 
@@ -255,16 +255,16 @@ func (_ClaimVerifierContract *ClaimVerifierContractCaller) VerifyProof(opts *bin
 
 }
 
-// VerifyProof is a free data retrieval call binding the contract method 0x65c03259.
+// VerifyProof is a free data retrieval call binding the contract method 0x23572511.
 //
-// Solidity: function verifyProof(uint256[8] proof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractSession) VerifyProof(proof [8]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyProof(uint256[8] proof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractSession) VerifyProof(proof [8]*big.Int, input [4]*big.Int) error {
 	return _ClaimVerifierContract.Contract.VerifyProof(&_ClaimVerifierContract.CallOpts, proof, input)
 }
 
-// VerifyProof is a free data retrieval call binding the contract method 0x65c03259.
+// VerifyProof is a free data retrieval call binding the contract method 0x23572511.
 //
-// Solidity: function verifyProof(uint256[8] proof, uint256[3] input) view returns()
-func (_ClaimVerifierContract *ClaimVerifierContractCallerSession) VerifyProof(proof [8]*big.Int, input [3]*big.Int) error {
+// Solidity: function verifyProof(uint256[8] proof, uint256[4] input) view returns()
+func (_ClaimVerifierContract *ClaimVerifierContractCallerSession) VerifyProof(proof [8]*big.Int, input [4]*big.Int) error {
 	return _ClaimVerifierContract.Contract.VerifyProof(&_ClaimVerifierContract.CallOpts, proof, input)
 }

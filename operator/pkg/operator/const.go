@@ -1,10 +1,10 @@
 package operator
 
 const (
-	NumberAccounts = 4
-	StateTreeDepth = 3
+	NumberAccounts = 65536
+	StateTreeDepth = 17
 
-	BatchSize = 4
+	BatchSize = 128
 
 	NumberBlockchains = 1
 	BlockchainID      = 0

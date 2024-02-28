@@ -1,18 +1,18 @@
 {
-  "runs": 1,
-  "dst": "data.csv",
-  "submit": true,
+  "runs": 10,
+  "dst": "data_128.csv",
+  "submit": false,
   "Logger": {
     "LogLevel": "info",
     "Format": "text"
   },
   "Ethereum": {
     "host": "http://127.0.0.1:7545",
-    "privateKey": "40a22e3e69ce6e6ebd2267567699b3ea90d1553cda128c2b43af69ac83d9c0ed",
-    "rollupContract": "0xD92F537E829b9C486D36210cC948b707013D9F7E",
-    "oracleMockContract": "0xd1B314C8bDb4458cc4CEe4d66edBf53260E04ED1",
-    "burnVerifierContract": "0xEa65bCcB430d0C31fA0CC44d17A2Aba36A89f9eF",
-    "claimVerifierContract": "0x3CEb02796C502Fcb505D2c6779BEEff3314fC78F"
+    "privateKey": "b21a39e77b9000e76141e00eaf3f560cccea1830d3570f5c77b280be4fedbef6",
+    "rollupContract": "0x927E51b3F6405aED2D234b8d574d028B2654B0A4",
+    "oracleMockContract": "0x38c3D6Af3606ea22b3e17734D106CBd52CCD9F87",
+    "burnVerifierContract": "0x42714870750d3833f178c6090a7Da043c585C428",
+    "claimVerifierContract": "0x6F877514fFD5D6BBD9416092A48b1Ba8DC3791AD"
   },
   "BurnCircuit": {
     "constraintSystemPath": "./build/burn_circuit.r1cs",

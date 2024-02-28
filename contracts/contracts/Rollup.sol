@@ -7,7 +7,7 @@ import "./OracleMock.sol";
 
 contract Rollup {
 
-    uint256 public constant BATCH_SIZE = 4;
+    uint256 public constant BATCH_SIZE = 128;
     uint256 public constant SUPPORTED_BLOCKCHAIN = 1;
 
     struct Transfer {
