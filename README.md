@@ -18,7 +18,7 @@ You need to have the following software installed:
 
 ### Constraint System Setup
 
-1. Change into the operator directory: `cd operator/`
+1. Change into the operator directory: `cd operator/cmd/setup`
 2. Install all dependencies: `go mod download`
 3. Adapt the batch size and the number of accounts in const.go
 4. Build the constraint system setup: `go build -o constraint_system_setup`
@@ -34,7 +34,7 @@ You need to have the following software installed:
 
 ### Operator
 
-1. Change into the operator directory: `cd operator/`
+1. Change into the operator directory: `cd operator/cmd/operator`
 2. Install all dependencies: `go mod download`
 3. Build the operator: `go build -o operator`
 4. Run the operator: `./operator -c ./configs/config.json`
